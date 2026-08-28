@@ -452,3 +452,8 @@ tools/ImageCropper/**/*.png
 
 config
 debug
+
+# MaaFramework reference docs (sparse-cloned, not tracked as submodule)
+external/maaframework-docs/
+# 游戏截图真相来源（含 UID 等个人信息，勿入库）
+reference/
