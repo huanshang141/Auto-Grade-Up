@@ -247,3 +247,109 @@ def _field_kind(field: str, profile: GameProfile, path: str) -> str:
                 f"字段 {field!r} 的属性代号不在档案 {profile.game} 的清单内", path
             )
     raise RuleValidationError(f"未知字段名：{field!r}", path)
+
+
+def export_json_schema(profile: GameProfile) -> dict:
+    """按游戏档案导出规则文件的 JSON Schema（Draft 2020-12），供 M5 编辑器消费。
+
+    与手写 validate() 同源：结构（顶层键集合固定）、game 比对、档案代号枚举与
+    candidates 的 slots/rarity 值域、fodder.strategy 枚举（与档案回合机制同源）、
+    运算符与字段类型兼容（if/then）、exists 无 value 的形状、值类型随字段。
+    所有枚举排序输出，同一档案两次导出结果一致；两端等价性由同一批样本双端
+    断言兜底（任务 6.1）。生成物不手工编辑：修改格式或档案后重新导出。
+    """
+    string_ops = sorted(STRING_OPS | {EXISTS})
+    numeric_ops = sorted(NUMERIC_OPS | {EXISTS})
+    string_fields = sorted(_STRING_FIELDS)
+    scalar_fields = sorted(_NUMERIC_SCALAR_FIELDS)
+    main_fields = sorted(f"main.{code}" for code in profile.stats)
+    sub_fields = sorted(f"sub.{code}" for code in profile.stats)
+
+    def leaf_branch(fields: list[str], value_schema: dict) -> dict:
+        # value 的类型声明必须在分支主体 properties 内（additionalProperties
+        # 只认同层声明），exists 不带 value 由 if/then 的存在性约束负责
+        return {
+            "type": "object",
+            "properties": {
+                "field": {"enum": fields},
+                "op": {"enum": string_ops if value_schema["type"] == "string" else numeric_ops},
+                "value": value_schema,
+            },
+            "required": ["field", "op"],
+            "additionalProperties": False,
+            "if": {"required": ["op"], "properties": {"op": {"const": EXISTS}}},
+            "then": {"not": {"required": ["value"]}},
+            "else": {"required": ["value"]},
+        }
+
+    number_schema = {"type": "number"}
+    string_schema = {"type": "string"}
+
+    def group_branch(key: str) -> dict:
+        return {
+            "type": "object",
+            "properties": {key: {"type": "array", "items": {"$ref": "#/$defs/node"}}},
+            "required": [key],
+            "additionalProperties": False,
+        }
+
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": f"Auto Grade Up 规则文件（{profile.game}）",
+        "type": "object",
+        "properties": {
+            "version": {"const": 1},
+            "game": {"const": profile.game},
+            "name": {"type": "string", "minLength": 1},
+            "candidates": {
+                "type": "object",
+                "properties": {
+                    "rarity": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": profile.rarity_min,
+                            "maximum": profile.rarity_max,
+                        },
+                    },
+                    "slots": {"type": "array", "items": {"enum": sorted(profile.slots)}},
+                    # 不与档案上限比对：超出无意义但无害（契约原文）
+                    "max_level": {"type": "integer"},
+                    "respect_lock": {"type": "boolean"},
+                },
+                "required": sorted(_CANDIDATES_KEYS),
+                "additionalProperties": False,
+            },
+            "rule": {"$ref": "#/$defs/node"},
+            "fodder": {
+                "type": "object",
+                "properties": {
+                    "strategy": {"enum": [profile.round_mechanism]},
+                    "respect_lock": {"type": "boolean"},
+                },
+                "required": sorted(_FODDER_KEYS),
+                "additionalProperties": False,
+            },
+        },
+        "required": sorted(_TOP_LEVEL_KEYS),
+        "additionalProperties": False,
+        "$defs": {
+            "node": {
+                "oneOf": [
+                    {"$ref": "#/$defs/group_all"},
+                    {"$ref": "#/$defs/group_any"},
+                    {"$ref": "#/$defs/leaf"},
+                ]
+            },
+            "group_all": group_branch("all"),
+            "group_any": group_branch("any"),
+            "leaf": {
+                "oneOf": [
+                    leaf_branch(string_fields, string_schema),
+                    leaf_branch(scalar_fields, number_schema),
+                    leaf_branch(main_fields, number_schema),
+                    leaf_branch(sub_fields, number_schema),
+                ]
+            },
+        },
+    }

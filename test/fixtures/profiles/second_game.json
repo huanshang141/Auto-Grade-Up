@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "game": "second_game",
+  "display_name": "第二游戏",
+  "stats": [
+    "crit_dmg",
+    "crit_rate",
+    "hp",
+    "second_stat"
+  ],
+  "slots": [
+    "flower",
+    "goblet",
+    "plume",
+    "ring",
+    "sands"
+  ],
+  "max_level": 15,
+  "roll_interval": 5,
+  "rarity_range": [1, 5],
+  "substat_max": 4,
+  "round_mechanism": "staged_fill"
+}

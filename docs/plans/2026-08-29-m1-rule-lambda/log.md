@@ -1,5 +1,19 @@
 # M1 执行日志
 
+## 2026-08-29 · Task 5.1
+- Tried:  叶子分支把 value 的类型约束只写在 if/then/else 的 else 子模式里，
+          分支主体 properties 未声明 value
+- Result: failed——additionalProperties: false 只认同层 properties 声明的键，
+          带 value 的合法叶子被生成物整体拒绝（13 例中 1 例失败）
+- Now:    value 类型声明提升到分支主体 properties（同时满足「值类型随字段」），
+          if/then/else 只管存在性（exists 无 value 由 then 的 not-required 负责）；
+          修复后 test_export.py 13 passed、全量 169 passed；另做非正式抽查，
+          生成物对七类非法样本全拒、合法样本全过
+- Convention: JSON Schema 里 additionalProperties: false 的对象，其允许键必须
+          全部出现在同层 properties 中，条件性键也一样；后续改生成物结构时
+          沿用 test_export 的双端冒烟（合法 + 非法样本）做回归
+
+
 ## 2026-08-29 · Task 4.1
 - Tried:  （无失败尝试，一次通过）测试先行：test_evaluate.py 28 例，红灯为导入失败
 - Result: 实现 evaluate.py 后 test_evaluate.py 28 passed、全量 156 passed

@@ -126,7 +126,7 @@
 
 ## 5. 导出命令
 
-- [ ] 5.1 JSON Schema 导出（schema.py 扩展 + CLI）
+- [x] 5.1 JSON Schema 导出（schema.py 扩展 + CLI）
   Goal:     导出命令按档案产出合法生成物，语义覆盖度足以拒绝非法样本（M5 编辑器消费）
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:216-219  (版本与校验)
             docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:336  (§8 同源方式)
