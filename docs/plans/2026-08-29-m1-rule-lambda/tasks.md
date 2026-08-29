@@ -28,7 +28,7 @@
 
 ## 2. 数据模型与游戏档案
 
-- [ ] 2.1 数据模型与数值解析（model.py）
+- [x] 2.1 数据模型与数值解析（model.py）
   Goal:     定义 Artifact/StatValue 与 OCR 文本解析器，JSON 往返无损；形状校验在模型，值域校验归档案（任务 2.2）
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:87-113  (§3 数据模型与解析约定)
             CONTEXT.md:7-15  (游戏概念术语)
