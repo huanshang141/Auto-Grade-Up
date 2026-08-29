@@ -122,18 +122,33 @@ def strip_spaces(text: str) -> str:
     return "".join(ch for ch in text if not ch.isspace())
 
 
+# 数值解析的字符白名单：拒绝 nan/inf/下划线分隔符等 Python 数字字面量，
+# 也拒绝全角数字与全角百分号（是否归一化由 M2 按游戏界面字形定夺）
+_VALUE_CHARS = frozenset("0123456789.+-")
+_LEVEL_CHARS = frozenset("0123456789+-")
+
+
 def parse_stat_value(text: str) -> tuple[float, bool]:
     """解析词条数值文本，返回 (数值, 是否百分比)。
 
     "5.8%" → (5.8, True)、"117" → (117.0, False)；先去除空白再解析；
-    百分比标记按后缀的 % 判断；非法文本抛 ValueError。
+    百分比标记按后缀的半角 % 判断；字符不在白名单（ASCII 数字、小数点、
+    正负号、半角百分号）或为空时抛 ValueError。
     """
     cleaned = strip_spaces(text)
     if cleaned.endswith("%"):
-        return (float(cleaned[:-1]), True)
-    return (float(cleaned), False)
+        body, is_percent = cleaned[:-1], True
+    else:
+        body, is_percent = cleaned, False
+    if not body or any(ch not in _VALUE_CHARS for ch in body):
+        raise ValueError(f"无法解析词条数值：{text!r}")
+    return (float(body), is_percent)
 
 
 def parse_level(text: str) -> int:
-    """解析强化等级文本。"+19" → 19、"0" → 0；先去除空白再解析；非法文本抛 ValueError。"""
-    return int(strip_spaces(text))
+    """解析强化等级文本。"+19" → 19、"0" → 0；先去除空白再解析；
+    字符不在白名单（ASCII 数字、正负号）或为空时抛 ValueError。"""
+    cleaned = strip_spaces(text)
+    if not cleaned or any(ch not in _LEVEL_CHARS for ch in cleaned):
+        raise ValueError(f"无法解析强化等级：{text!r}")
+    return int(cleaned)

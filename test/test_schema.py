@@ -123,6 +123,41 @@ class TestLegalRules:
         assert validate(rule, genshin) is None
 
 
+class TestIntegralSemantics:
+    """整数字段语义与 JSON Schema 2020-12 对齐：数值部分为整数即整数（1.0 视同 1），
+    布尔不算；两侧结论必须一致（design.md D4）。"""
+
+    def test_version_accepts_integral_float(self, genshin):
+        rule = make_rule()
+        rule["version"] = 1.0
+        assert validate(rule, genshin) is None
+
+    def test_max_level_accepts_integral_float(self, genshin):
+        rule = make_rule()
+        rule["candidates"]["max_level"] = 20.0
+        assert validate(rule, genshin) is None
+
+    def test_rarity_accepts_integral_float(self, genshin):
+        rule = make_rule()
+        rule["candidates"]["rarity"] = [5.0]
+        assert validate(rule, genshin) is None
+
+    def test_version_fractional_rejected(self, genshin):
+        rule = make_rule()
+        rule["version"] = 1.5
+        expect_error(rule, "version", genshin)
+
+    def test_rarity_fractional_rejected(self, genshin):
+        rule = make_rule()
+        rule["candidates"]["rarity"] = [5.5]
+        expect_error(rule, "candidates.rarity[0]", genshin)
+
+    def test_version_bool_rejected(self, genshin):
+        rule = make_rule()
+        rule["version"] = True
+        expect_error(rule, "version", genshin)
+
+
 class TestTopLevel:
     def test_missing_key(self, genshin):
         rule = make_rule()
@@ -315,9 +350,19 @@ class TestConditionTree:
         rule["rule"] = {"all": [{"field": "level", "op": "==", "value": "5"}]}
         expect_error(rule, "rule.all[0]", genshin)
 
+    def test_numeric_field_rejects_bool_value(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "level", "op": "==", "value": True}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
     def test_string_field_rejects_number_value(self, genshin):
         rule = make_rule()
         rule["rule"] = {"all": [{"field": "set", "op": "==", "value": 5}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    def test_string_field_rejects_bool_value(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "set", "op": "==", "value": False}]}
         expect_error(rule, "rule.all[0]", genshin)
 
     def test_reserved_contains_operator(self, genshin):

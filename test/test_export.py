@@ -6,6 +6,7 @@
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -126,12 +127,17 @@ class TestExportJsonSchema:
 
 class TestCli:
     def run_cli(self, *args: str) -> subprocess.CompletedProcess:
+        # 固定子进程输出编码为 UTF-8：普通中文 Windows 上默认编码是 GBK，
+        # 严格解码子进程 stderr 会崩溃；errors="replace" 再兜一层底
+        env = dict(os.environ, PYTHONUTF8="1")
         return subprocess.run(
             [sys.executable, "-m", "agent.rule_lambda", *args],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             encoding="utf-8",
+            errors="replace",
+            env=env,
         )
 
     def test_export_success_writes_file(self, tmp_path):
@@ -165,3 +171,13 @@ class TestCli:
         assert result.returncode != 0
         assert result.stderr.strip()
         assert not out.exists()
+
+    def test_unwritable_output_fails_cleanly(self, tmp_path):
+        # 输出路径的父亲是文件，写入必失败；须一行中文原因 + 退出码 1，不抛 traceback
+        blocker = tmp_path / "blocker"
+        blocker.write_text("占位", encoding="utf-8")
+        out = blocker / "out.json"
+        result = self.run_cli("export", str(GENSHIN_PROFILE), str(out))
+        assert result.returncode == 1
+        assert result.stderr.strip()
+        assert "Traceback" not in result.stderr

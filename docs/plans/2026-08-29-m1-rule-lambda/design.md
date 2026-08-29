@@ -28,7 +28,7 @@
 
 ## D4 手写校验为权威，JSON Schema 生成物保证等价
 
-**选择**：`schema.py` 手写 `validate()` 是规则文件校验的权威实现；`export_json_schema()` 生成的 JSON Schema 是给 M5 编辑器的同源副本。运算符与字段类型的兼容规则（字符串字段仅 `==`/`!=`/`exists` 等）用 JSON Schema 的 `if/then` 条件约束表达。两者的等价性不靠约定，靠同一批合法/非法样本双端断言（任务 6.1）。
+**选择**：`schema.py` 手写 `validate()` 是规则文件校验的权威实现；`export_json_schema()` 生成的 JSON Schema 是给 M5 编辑器的同源副本。运算符与字段类型的兼容规则（字符串字段仅 `==`/`!=`/`exists` 等）用 JSON Schema 的 `if/then` 条件约束表达。两者的等价性不靠约定，靠同一批合法/非法样本双端断言（任务 6.1）。整数字段（version、candidates.rarity 元素、candidates.max_level）的「整数」语义按 JSON Schema 2020-12 对齐——数值部分为整数即整数（1.0 视同 1），布尔不算——Python 侧与生成物保持一致，避免浮点整数样本两端漂移（2026-08-29 代码评审定案）。
 
 **理由**：spec §14 M1 验收明确要求「非法样例被生成物拒绝」，生成物必须接近全语义，不能只查结构。
 

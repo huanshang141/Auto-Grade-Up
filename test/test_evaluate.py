@@ -160,6 +160,13 @@ class TestTraceShape:
         assert set(trace) == {"kind", "passed", "field", "op", "actual"}
         assert trace["actual"] == 5.8
 
+    def test_string_leaf_trace_shape(self, genshin):
+        trace = evaluate({"all": [{"field": "slot", "op": "==", "value": "sands"}]},
+                         make_artifact(), genshin).trace["children"][0]
+        assert set(trace) == {"kind", "passed", "field", "op", "value", "actual"}
+        assert trace["actual"] == "sands"
+        assert trace["passed"] is True
+
     def test_missing_actual_is_missing_string(self, genshin):
         artifact = make_artifact(substats=[])
         trace = evaluate({"all": [{"field": "sub.crit_rate", "op": ">=", "value": 0}]},
@@ -184,10 +191,27 @@ class TestTraceShape:
         assert len(inner_all["children"]) == 2
 
     def test_every_passed_independently_recheckable(self, genshin):
-        """组节点的 passed 可由子节点 passed 独立复核。"""
-        tree = double_crit_tree()
+        """组节点的 passed 可由子节点 passed 独立复核（递归到每个组节点）。"""
+        tree = {
+            "all": [
+                {"any": [{"field": "level", "op": "exists"}, {"all": []}]},
+                {"any": []},
+                {"field": "rarity", "op": "==", "value": 5},
+            ]
+        }
         trace = evaluate(tree, make_artifact(), genshin).trace
-        assert trace["passed"] == all(c["passed"] for c in trace["children"])
+
+        def walk(node: dict, node_trace: dict) -> None:
+            if "all" not in node and "any" not in node:
+                return
+            kind = "all" if "all" in node else "any"
+            child_passed = [child["passed"] for child in node_trace["children"]]
+            expected = all(child_passed) if kind == "all" else any(child_passed)
+            assert node_trace["passed"] == expected, node_trace["kind"]
+            for child, child_trace in zip(node[kind], node_trace["children"]):
+                walk(child, child_trace)
+
+        walk(tree, trace)
 
 
 class TestStateless:

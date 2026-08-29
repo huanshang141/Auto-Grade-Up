@@ -76,7 +76,9 @@ class TestParseStatValue:
         assert parse_stat_value("0") == (0.0, False)
 
     @pytest.mark.parametrize(
-        "text", ["", "   ", "%", "5.8%%", "abc", "5.8 percent"]
+        "text",
+        ["", "   ", "%", "5.8%%", "abc", "5.8 percent", "nan", "inf", "-inf",
+         "1_9", "１９", "5.8％", "e5", "0x10"],
     )
     def test_invalid_raises_value_error(self, text):
         with pytest.raises(ValueError):
@@ -94,7 +96,9 @@ class TestParseLevel:
         assert parse_level(" +4 ") == 4
         assert parse_level("+ 19") == 19
 
-    @pytest.mark.parametrize("text", ["", "abc", "19.5", "++1"])
+    @pytest.mark.parametrize(
+        "text", ["", "abc", "19.5", "++1", "1_9", "１９", "inf", "+ 19e2"]
+    )
     def test_invalid_raises_value_error(self, text):
         with pytest.raises(ValueError):
             parse_level(text)

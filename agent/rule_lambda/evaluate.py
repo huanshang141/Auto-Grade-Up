@@ -105,6 +105,8 @@ def _field_value(field: str, artifact: Artifact, profile: GameProfile):
         # 主词条恰为该代号时存在
         return artifact.main.value if artifact.main.name == code else _MISSING
     if namespace == "sub":
+        # 代号重复时取首个匹配；游戏不会产生重复代号，重复属观测异常，
+        # 是否在值域校验中拒绝由 M2 接线时定夺
         for substat in artifact.substats:
             if substat.name == code:
                 return substat.value

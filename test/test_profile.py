@@ -195,6 +195,18 @@ class TestLoadProfileRejections:
         with pytest.raises(ProfileError):
             write_and_load(tmp_path, data)
 
+    def test_duplicate_stats_codes(self, tmp_path):
+        data = make_profile_dict()
+        data["stats"] = ["hp", "hp", "atk"]
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    def test_duplicate_slots_codes(self, tmp_path):
+        data = make_profile_dict()
+        data["slots"] = ["flower", "flower"]
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
     def test_unknown_round_mechanism(self, tmp_path):
         data = make_profile_dict()
         data["round_mechanism"] = "per_roll"

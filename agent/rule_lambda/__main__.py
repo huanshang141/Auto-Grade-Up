@@ -35,10 +35,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         schema = export_json_schema(profile)
         output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(schema, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-        )
+        try:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(
+                json.dumps(schema, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+        except OSError as exc:
+            print(f"生成物写入失败：{exc}", file=sys.stderr)
+            return 1
         return 0
     raise AssertionError(f"不可达的子命令：{args.command}")
 

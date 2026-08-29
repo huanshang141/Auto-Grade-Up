@@ -1,5 +1,22 @@
 # M1 执行日志
 
+## 2026-08-29 · 代码评审轮（子代理评审 + 修复）
+- Tried:  子代理逐条契约核对（基线 169 passed），报 0 阻塞、2 主要（M1 浮点整数
+          双端分歧、M2 CLI 测试编码脆弱）、6 次要；本人用探针复核 M1 成立
+- Result: 按需求方批准全部修复——
+          M1：整数字段「整数」语义与 JSON Schema 2020-12 对齐（1.0 视同 1，
+          布尔不算，_is_rule_integer），design.md D4 落档；
+          M2：run_cli 注入 PYTHONUTF8=1 + errors="replace"；
+          次要：布尔 value 用例、解析字符白名单（拒绝 nan/inf/下划线/全角，
+          全角归一化留 M2）、档案清单拒绝重复代号、CLI 写文件兜底 OSError、
+          ProfileError/load_profile 类型标注、字符串叶子 trace 用例、
+          passed 递归复核用例；重复副词条代号取首个匹配写入 docstring，
+          值域校验是否拒绝重复留 M2 定夺
+- Now:    全量 193 passed；浮点整数六样本探针双端结论全部一致
+- Convention: 整数语义对齐决策在 design.md D4；「含数值的 JSON 互换格式」
+          后续一律按数学值判整数，勿用裸 isinstance(int)
+
+
 ## 2026-08-29 · Task 5.1
 - Tried:  叶子分支把 value 的类型约束只写在 if/then/else 的 else 子模式里，
           分支主体 properties 未声明 value

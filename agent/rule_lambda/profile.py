@@ -19,7 +19,7 @@ from pathlib import Path
 class ProfileError(Exception):
     """游戏档案缺失或非法。message 之外附带档案路径，便于定位。"""
 
-    def __init__(self, message: str, path):
+    def __init__(self, message: str, path: str | Path):
         self.message = message
         self.path = str(path)
         super().__init__(f"{message}（档案：{self.path}）")
@@ -64,7 +64,7 @@ _PROFILE_KEYS = {
 }
 
 
-def load_profile(path) -> GameProfile:
+def load_profile(path: str | Path) -> GameProfile:
     """从 JSON 文件加载游戏档案；缺失或非法时抛 ProfileError（message + 文件路径）。"""
     path = Path(path)
     if not path.is_file():
@@ -137,12 +137,14 @@ def load_profile(path) -> GameProfile:
 
 
 def _check_code_list(data: dict, key: str, path) -> None:
-    """校验代号清单（stats/slots）：非空列表、元素为非空字符串。"""
+    """校验代号清单（stats/slots）：非空列表、元素为非空字符串、不得重复。"""
     value = data[key]
     if not isinstance(value, list):
         raise ProfileError(f"{key} 必须是列表，实际为 {type(value).__name__}", path)
     if not value:
         raise ProfileError(f"{key} 清单为空", path)
+    if len(set(value)) != len(value):
+        raise ProfileError(f"{key} 清单含重复代号", path)
     for item in value:
         if not isinstance(item, str) or not item:
             raise ProfileError(f"{key} 的元素必须是非空字符串，实际为 {item!r}", path)

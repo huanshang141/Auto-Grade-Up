@@ -7,6 +7,9 @@ JSON Schema 导出（见本模块 export_json_schema，任务 5.1）是与编辑
 同源副本，两端等价性由同一批样本双端断言兜底（任务 6.1）。
 
 属性代号与部位代号不固化于代码：校验时从传入的游戏档案读取（ADR-0004）。
+整数字段（version、candidates.rarity 元素、candidates.max_level）的「整数」语义
+与 JSON Schema 2020-12 对齐——数值部分为整数即整数（1.0 视同 1），布尔不算
+——保证手写校验与生成物双端等价无例外（design.md D4，2026-08-29 评审定案）。
 """
 
 from __future__ import annotations
@@ -40,6 +43,20 @@ class RuleValidationError(Exception):
         super().__init__(f"{message}（位置：{node_path}）" if node_path else message)
 
 
+def _is_rule_integer(value) -> bool:
+    """「整数」语义与 JSON Schema 2020-12 对齐：数值部分为整数即整数，布尔不算。
+
+    JSON 只有一种数字类型，1.0 与 1 是同一个数；生成物侧 {"const": 1} 与
+    {"type": "integer"} 均接受 1.0，Python 侧必须同样接受，否则浮点整数样本
+    两端结论相反（2026-08-29 评审发现的分歧点）。
+    """
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and value.is_integer()
+
+
 def validate(rules: dict, profile: GameProfile) -> None:
     """校验规则文件；合法返回 None，非法抛 RuleValidationError。"""
     if not isinstance(rules, dict):
@@ -54,7 +71,7 @@ def validate(rules: dict, profile: GameProfile) -> None:
         raise RuleValidationError(f"规则文件含未知键：{sorted(extra)}")
 
     version = rules["version"]
-    if isinstance(version, bool) or not isinstance(version, int):
+    if not _is_rule_integer(version):
         raise RuleValidationError(f"version 必须是整数，实际为 {version!r}", "version")
     if version != 1:
         raise RuleValidationError(f"version 仅接受 1，实际为 {version}", "version")
@@ -94,7 +111,7 @@ def _validate_candidates(candidates, profile: GameProfile) -> None:
             "candidates.rarity",
         )
     for i, element in enumerate(rarity):
-        if isinstance(element, bool) or not isinstance(element, int):
+        if not _is_rule_integer(element):
             raise RuleValidationError(
                 f"candidates.rarity 的元素必须是整数，实际为 {element!r}",
                 f"candidates.rarity[{i}]",
@@ -122,7 +139,7 @@ def _validate_candidates(candidates, profile: GameProfile) -> None:
 
     max_level = candidates["max_level"]
     # 不与档案上限比对：超出档案上限无意义但无害（契约原文）
-    if isinstance(max_level, bool) or not isinstance(max_level, int):
+    if not _is_rule_integer(max_level):
         raise RuleValidationError(
             f"candidates.max_level 必须是整数，实际为 {max_level!r}", "candidates.max_level"
         )
