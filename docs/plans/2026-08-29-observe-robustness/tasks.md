@@ -12,22 +12,28 @@
 
 ## 1. 截图来源归整与夹具扩展
 
-- [ ] 1.1 pic4 并入 pic3，处理脚本扩到 27 张
-  Goal:     补拍批次一个目录管理（需求方定案）；27 张夹具处理入库
+- [ ] 1.1 四个批次目录合并为 reference/pic/，处理脚本扩到 27 张
+  Goal:     所有测试与开发用图一个目录管理（需求方定案）；27 张夹具处理入库
   Read:     tools/prepare_fixtures.py:16-24  (来源目录常量与张数断言)
+            tools/prepare_fixtures.py:27-32  (fixture_stem：图N 映射 figN、
+            其余沿用主干——合并后逻辑不变)
             test/fixtures/incoming/README.md  (扩测路径节、验收记录节)
-  Touch:    reference/pic3/ | tools/prepare_fixtures.py | test/fixtures/screenshots/ | test/fixtures/incoming/README.md
+  Touch:    reference/pic/ | tools/prepare_fixtures.py | test/fixtures/screenshots/ | test/fixtures/incoming/README.md
   Contract:
-    pic4 的 E6_enhance_lv20_max.png、E7_enhance_lv4_new_stat.png 移入
-          pic3，删除空目录 pic4；prepare_fixtures.py 来源清单加 pic3、
-          张数断言 18 → 27；重跑后 screenshots/ 共 27 张（新增
-          L9_list_locked_lv20、L10_list_4star_lv16、L11_list_crit_dmg_circlet、
-          L12_list_em_sands、L13_list_healing_circlet、E4_enhance_lv16_marks、
-          E5_enhance_lv8_preview、E6_enhance_lv20_max、E7_enhance_lv4_new_stat）；
-          README 中 pic4 引用改为 pic3、「25 张」口径修正为 27
-  Verify:   python tools/prepare_fixtures.py → 自检 27 张；ls test/fixtures/screenshots/*.png | wc -l → 27；
-          git status --short test/fixtures/screenshots → 无变化（幂等）
-  Done:     27 张夹具入库、尺寸与 UID 遮挡自检通过、幂等复验一致
+    pic2/pic3/pic4 的 20 张全部移入 pic/（合并后 27 张：fig1~fig7、
+          L1~L8、E1~E3、L9_list_locked_lv20、L10_list_4star_lv16、
+          L11_list_crit_dmg_circlet、L12_list_em_sands、
+          L13_list_healing_circlet、E4_enhance_lv16_marks、
+          E5_enhance_lv8_preview、E6_enhance_lv20_max、
+          E7_enhance_lv4_new_stat），删除空的 pic2/pic3/pic4；
+          prepare_fixtures.py 只留 pic/ 一个来源常量、张数断言 18 → 27、
+          docstring 与打印同步；重跑后 screenshots/ 共 27 张；
+          README 中 pic2/pic3/pic4 引用全部改为 pic/、「25 张」口径
+          修正为 27；后续批次直接放 pic/，不再开新目录
+  Verify:   python tools/prepare_fixtures.py → 自检 27 张；ls reference/pic/*.png | wc -l → 27；
+          ls test/fixtures/screenshots/*.png | wc -l → 27；
+          ls reference/ → 无 pic2/pic3/pic4
+  Done:     单一来源目录、27 张夹具入库、尺寸与 UID 遮挡自检通过、幂等复验一致
 
 ---
 

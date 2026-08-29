@@ -3,12 +3,16 @@
 每条：选择、理由、被拒方案。已确认的领域结论见 `discussion.md` 与
 `docs/specs/observation.md`，此处只记实现层取舍。
 
-## D1 截图来源归整：pic4 并入 pic3
+## D1 截图来源归整：四个批次目录合并为 reference/pic/
 
-pic4 的两张（E6、E7）移入 pic3，删除 pic4 目录；`prepare_fixtures.py`
-来源清单加 pic3、张数断言 18 → 27。理由：需求方定案（补拍批次一个目录
-便于管理）；pic/pic2 保持不动（历史批次不改名）。
-被拒：保留 pic4 并在脚本加第四个来源——目录碎片化，需求方明确否决。
+`reference/pic/`（7 张）、`pic2/`（11 张）、`pic3/`（7 张）、`pic4/`
+（2 张）全部合并进 `reference/pic/`，删除 pic2/pic3/pic4 目录；27 张
+文件名互不冲突（fig1~fig7、L1~L8、E1~E3、L9~L13、E4~E7），合并后
+`prepare_fixtures.py` 只留一个来源常量、张数断言 18 → 27。
+理由：需求方定案（所有测试与开发用图一个文件夹管理，避免多子目录混乱）。
+被拒：pic4 并入 pic3 保留批次目录——仍是多目录，需求方第二次定案否决；
+新建语义化目录名（如 fixtures-src）——无收益的改名，沿用 pic/ 最短路径。
+后续批次直接放 pic/，不再开新目录。
 
 ## D2 满级「MAX」标记走流水线 replace
 
