@@ -1,5 +1,30 @@
 # M2 执行日志
 
+## 2026-08-29 · Task 4.3
+- Tried:  先读 maa 绑定源码定 API（post_recognition(JRecognitionType, JRecognitionParam,
+          BGR ndarray) → TaskJob → task detail → node detail → RecognitionDetail）；
+          DbgController 不可用（wheel 未附带 MaaDbgControlUnit 库）→ 直接
+          MaaTaskerBindResource 只绑 Resource，离线识别可跑（实测）。转储取
+          filtered_results——replace 纠错只作用于该结果集（all 为原始识别）；
+          replace 的匹配是正则（首个版本把等级节点的「.」写成正则任意字符，
+          「+0」被整串清空，须转义为「\\.」）；build_param 首版漏传 expected，
+          套装过滤不生效，靠「探针手工传参有效、录制不生效」定位
+- Result: 18 份转储入库；形状断言通过（区域键集合、文字框三键）；解析核心
+          对 18 份转储验证 17 张 ok、fig5 按预期失败（素材下拉弹窗遮住主词条名
+          与副词条名，5.1 按可见范围放宽）；识别质量异常仅 fig5 fodder_tier 空
+- Now:    随录制实测落地的调优（design D4 路径）：多行区域（两界面主词条/副词条、
+          列表页套装）退回检测模式 only_rec=false；replace 纠错四处——两个等级节点
+          去尾部「.」「。」、列表副词条去行首「·」、强化副词条去 ①~⑤ 与行首
+          ①误读的「0」（后随非数字非小数点才删）、面包屑去「。」并归一「／√」
+          为「/」；列表套装 roi 上扩覆盖 4 星布局（套装块上移与 5 星第 3/4 副词条
+          槽重叠）+ expected 正则滤行 + 读取器取最上一行；契约「流水线节点约定」
+          行按此修订；解析核心 _join_text 改为按行分组拼接（修 fig2/fig4 主词条
+          名值框高低差导致的顺序颠倒）
+- Convention: 读取器归属——fig1/fig3/fig6/fig7 与 L1…L8 走列表页节点，fig2/fig4/fig5
+          与 E1…E3 走强化页节点（fig6/fig7 为排序设置截图但面板完整可读，如实入库）；
+          maa 版本 5.12.3 打印并记此；真实读数抽验：L5 主词条 3967（千位逗号）、
+          L6 四星 2 条副词条 + 套装千岩牢固、L1 第 4 行「生命值+269（待激活）」整行丢弃
+
 ## 2026-08-29 · Task 4.2
 - Tried:  坐标标定走网格叠加读图（全图 50px 网格 → 右栏 2 倍精细网格 → 挂锁区 8 倍
           像素网格）；挂锁模板首裁偏（带进右侧背景），按像素网格重裁

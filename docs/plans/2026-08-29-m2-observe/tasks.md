@@ -135,7 +135,7 @@
           并人工核对节点名清单与区域键一致
   Done:     15 节点齐备；roi 由夹具截图取点（VSCode 插件或读图量取）；模板图入库
 
-- [ ] 4.3 转储录制脚本与真实转储入库
+- [x] 4.3 转储录制脚本与真实转储入库
   Goal:     录制脚本走框架识别产出真实转储，形状与解析核心输入契约一致
   Read:     docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (识别结果转储节)
             docs/plans/2026-08-29-m2-observe/design.md:68-72  (D8)

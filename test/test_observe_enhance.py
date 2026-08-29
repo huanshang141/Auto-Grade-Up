@@ -106,6 +106,16 @@ class TestReadEnhanceHappyPath:
         assert result.extras["fingerprint"] == {"slot": "circlet", "name": "另一件圣遗物"}
         assert result.artifact.slot == "circlet"
 
+    def test_main_same_row_boxes_ordered_left_to_right(self):
+        """同行名值两框顶略有高低（值框更高）也按横序拼接，不按纵序颠倒。"""
+        recognition = make_enhance_recognition()
+        recognition["main"] = [
+            make_box("298", 0.95, box=[1199, 148, 50, 22]),
+            make_box("攻击力", 0.95, box=[798, 152, 60, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.artifact.main == StatValue(name="atk", value=298.0)
+
     def test_confidences_are_min_scores_of_used_boxes(self):
         result = read_enhance(make_enhance_recognition(), CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.confidences == {

@@ -90,6 +90,7 @@
 
 ## 流水线节点约定
 
-- 节点位于资源包 `pipeline/`；命名 `obs_<reader>_<region>`；OCR 节点 `only_rec` + 精确 roi；
-  星级、锁定为 TemplateMatch；节点不含 action 与 next
+- 节点位于资源包 `pipeline/`；命名 `obs_<reader>_<region>`；OCR 节点精确 roi——单行区域
+  `only_rec`，多行区域（两界面的主词条与副词条、列表页套装）用检测模式并以 `expected`
+  过滤行；星级、锁定为 TemplateMatch；节点不含 action 与 next
 - 节点名到区域键的映射属于录制脚本与 M3 接线层，不属于解析核心契约

@@ -260,16 +260,18 @@ def _record_confidence(confidences: dict, recognition: dict, key: str) -> None:
 
 
 def _join_text(boxes) -> str:
-    """区域内多文字框按阅读序（先上后下、先左后右）以空格连接。
+    """区域内多文字框按行分组、行内按横序、行间按纵序，以空格连接。
 
     名与值常各成一个文字框：列表页主词条上下两行（名在上、值在下），
-    强化页主词条同行左右（名左值右），按此排序拼接即得行文本。
+    强化页主词条同行左右（名左值右，两框顶略有高低），按此拼接即得行文本。
     """
-    texts = [
-        box.get("text", "")
-        for box in sorted(boxes, key=lambda b: (b["box"][1], b["box"][0]))
-        if strip_spaces(box.get("text", ""))
-    ]
+    texts = []
+    for row in _group_rows(boxes):
+        texts.extend(
+            box.get("text", "")
+            for box in sorted(row, key=lambda b: b["box"][0])
+            if strip_spaces(box.get("text", ""))
+        )
     return " ".join(texts)
 
 
@@ -373,12 +375,17 @@ def _parse_stat_row(row_text, textmap, failures, warnings, label) -> StatValue |
 
 
 def _read_set(recognition, confidences) -> str | None:
-    """套装名取游戏原文（不经对照文档）；显示行的冒号后缀不入模。"""
+    """套装名取套装名行（最上一行）的游戏原文，不经对照文档；冒号后缀不入模。
+
+    roi 覆盖两种稀有度的套装块（4 星面板上移），流水线以 expected 正则滤掉
+    副词条行与带数字的效果行；纯中文的效果换行可能残留，取最上一行即套装名。
+    """
     boxes = [b for b in recognition.get("set") or [] if strip_spaces(b.get("text", ""))]
     if not boxes:
         return None
-    confidences["set"] = min(box["score"] for box in boxes)
-    return strip_spaces(_join_text(boxes)).rstrip("：:")
+    name_row = sorted(_group_rows(boxes)[0], key=lambda b: b["box"][0])
+    confidences["set"] = min(box["score"] for box in name_row)
+    return strip_spaces(" ".join(box.get("text", "") for box in name_row)).rstrip("：:")
 
 
 def _substat_count_warning(rarity, level, count, profile) -> str | None:

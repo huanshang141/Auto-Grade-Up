@@ -2,91 +2,238 @@
   "obs_list_name": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [885, 78, 250, 38],
+    "roi": [
+      885,
+      78,
+      250,
+      38
+    ],
     "threshold": 0.3
   },
   "obs_list_slot": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [885, 118, 120, 32],
+    "roi": [
+      885,
+      118,
+      120,
+      32
+    ],
     "threshold": 0.3
   },
   "obs_list_main": {
     "recognition": "OCR",
-    "only_rec": true,
-    "roi": [885, 175, 180, 58],
+    "only_rec": false,
+    "roi": [
+      885,
+      175,
+      180,
+      58
+    ],
     "threshold": 0.3
   },
   "obs_list_level": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [885, 280, 70, 30],
-    "threshold": 0.3
+    "roi": [
+      885,
+      280,
+      70,
+      30
+    ],
+    "threshold": 0.3,
+    "replace": [
+      [
+        "\\.",
+        ""
+      ],
+      [
+        "。",
+        ""
+      ]
+    ]
   },
   "obs_list_substats": {
     "recognition": "OCR",
-    "only_rec": true,
-    "roi": [898, 315, 200, 102],
-    "threshold": 0.3
+    "only_rec": false,
+    "roi": [
+      898,
+      315,
+      200,
+      102
+    ],
+    "threshold": 0.3,
+    "replace": [
+      [
+        "·",
+        ""
+      ]
+    ],
+    "expected": [
+      ".+\\+"
+    ]
   },
   "obs_list_set": {
     "recognition": "OCR",
-    "only_rec": true,
-    "roi": [883, 418, 140, 26],
-    "threshold": 0.3
+    "only_rec": false,
+    "roi": [
+      883,
+      371,
+      200,
+      90
+    ],
+    "threshold": 0.3,
+    "expected": [
+      "^[一-鿿]+[：:]?$"
+    ]
   },
   "obs_list_stars": {
     "recognition": "TemplateMatch",
     "template": "genshin/stars.png",
-    "roi": [883, 232, 130, 30],
+    "roi": [
+      883,
+      232,
+      130,
+      30
+    ],
     "threshold": 0.7
   },
   "obs_list_lock": {
     "recognition": "TemplateMatch",
     "template": "genshin/lock.png",
-    "roi": [1118, 276, 34, 38],
+    "roi": [
+      1118,
+      276,
+      34,
+      38
+    ],
     "threshold": 0.7
   },
   "obs_enhance_breadcrumb": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [90, 16, 300, 30],
-    "threshold": 0.3
+    "roi": [
+      90,
+      16,
+      300,
+      30
+    ],
+    "threshold": 0.3,
+    "replace": [
+      [
+        "。",
+        ""
+      ],
+      [
+        "／",
+        "/"
+      ],
+      [
+        "√",
+        "/"
+      ]
+    ]
   },
   "obs_enhance_main": {
     "recognition": "OCR",
-    "only_rec": true,
-    "roi": [778, 150, 480, 40],
+    "only_rec": false,
+    "roi": [
+      778,
+      150,
+      480,
+      40
+    ],
     "threshold": 0.3
   },
   "obs_enhance_level": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [778, 84, 75, 32],
-    "threshold": 0.3
+    "roi": [
+      778,
+      84,
+      75,
+      32
+    ],
+    "threshold": 0.3,
+    "replace": [
+      [
+        "\\.",
+        ""
+      ],
+      [
+        "。",
+        ""
+      ]
+    ]
   },
   "obs_enhance_exp": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [1145, 94, 125, 26],
+    "roi": [
+      1145,
+      94,
+      125,
+      26
+    ],
     "threshold": 0.3
   },
   "obs_enhance_substats": {
     "recognition": "OCR",
-    "only_rec": true,
-    "roi": [775, 200, 480, 142],
-    "threshold": 0.3
+    "only_rec": false,
+    "roi": [
+      775,
+      200,
+      480,
+      142
+    ],
+    "threshold": 0.3,
+    "replace": [
+      [
+        "①",
+        ""
+      ],
+      [
+        "②",
+        ""
+      ],
+      [
+        "③",
+        ""
+      ],
+      [
+        "④",
+        ""
+      ],
+      [
+        "⑤",
+        ""
+      ],
+      [
+        "^0(?=[^0-9.])",
+        ""
+      ]
+    ]
   },
   "obs_enhance_mora": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [780, 658, 200, 36],
+    "roi": [
+      780,
+      658,
+      200,
+      36
+    ],
     "threshold": 0.3
   },
   "obs_enhance_fodder_tier": {
     "recognition": "OCR",
     "only_rec": true,
-    "roi": [790, 498, 215, 32],
+    "roi": [
+      790,
+      498,
+      215,
+      32
+    ],
     "threshold": 0.3
   }
 }

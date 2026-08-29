@@ -223,6 +223,18 @@ class TestReadListMultiBoxRows:
         ]
 
 
+    def test_set_name_picked_from_topmost_row(self):
+        """套装块可能残留纯中文的效果换行（expected 正则滤不掉），最上一行为套装名。"""
+        recognition = make_list_recognition()
+        recognition["set"] = [
+            make_box("中附近的所有角色攻击力", 1.0, box=[905, 443, 176, 16]),
+            make_box("千岩牢固:", 0.91, box=[888, 371, 73, 17]),
+        ]
+        result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
+        assert result.artifact.set == "千岩牢固"
+        assert result.confidences["set"] == 0.91
+
+
 class TestReadListFailures:
     def test_missing_required_region(self):
         recognition = make_list_recognition()
