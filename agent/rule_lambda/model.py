@@ -123,7 +123,8 @@ def strip_spaces(text: str) -> str:
 
 
 # 数值解析的字符白名单：拒绝 nan/inf/下划线分隔符等 Python 数字字面量，
-# 也拒绝全角数字与全角百分号（是否归一化由 M2 按游戏界面字形定夺）
+# 也拒绝全角数字与全角百分号（2026-08-29 定案：不归一化，直接拒绝）。
+# 千位分隔符逗号（如「3,967」）在解析前去除，见 parse_stat_value。
 _VALUE_CHARS = frozenset("0123456789.+-")
 _LEVEL_CHARS = frozenset("0123456789+-")
 
@@ -131,11 +132,12 @@ _LEVEL_CHARS = frozenset("0123456789+-")
 def parse_stat_value(text: str) -> tuple[float, bool]:
     """解析词条数值文本，返回 (数值, 是否百分比)。
 
-    "5.8%" → (5.8, True)、"117" → (117.0, False)；先去除空白再解析；
+    "5.8%" → (5.8, True)、"117" → (117.0, False)；先去除空白、再去千位分隔符
+    逗号（固定值大数值显示为「3,967」，2026-08-29 补拍核验）再解析；
     百分比标记按后缀的半角 % 判断；字符不在白名单（ASCII 数字、小数点、
     正负号、半角百分号）或为空时抛 ValueError。
     """
-    cleaned = strip_spaces(text)
+    cleaned = strip_spaces(text).replace(",", "")
     if cleaned.endswith("%"):
         body, is_percent = cleaned[:-1], True
     else:

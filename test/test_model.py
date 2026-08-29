@@ -72,6 +72,13 @@ class TestParseStatValue:
         assert parse_stat_value(" 5.8 % ") == (5.8, True)
         assert parse_stat_value("\u3000117\u3000") == (117.0, False)
 
+    def test_thousands_separator_comma_removed_before_parse(self):
+        """固定值大数值显示为「3,967」（2026-08-29 补拍核验）：白名单接受逗号，解析前去逗号。"""
+        assert parse_stat_value("3,967") == (3967.0, False)
+        assert parse_stat_value("+3,967") == (3967.0, False)
+        assert parse_stat_value(" 3 , 967 ") == (3967.0, False)
+        assert parse_stat_value("3,967%") == (3967.0, True)
+
     def test_zero(self):
         assert parse_stat_value("0") == (0.0, False)
 
