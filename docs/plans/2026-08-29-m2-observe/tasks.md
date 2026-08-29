@@ -47,7 +47,7 @@
 
 ## 3. 解析核心
 
-- [ ] 3.1 词条行切分与代号适配
+- [x] 3.1 词条行切分与代号适配
   Goal:     两界面行格式统一解析为（词条名文本，数值文本），并映射到属性代号；未收录走警告路径
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:106-113  (§3 解析约定：去空白、% 后缀)
             docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (字段组装规则、未知与缺失语义)
@@ -66,7 +66,7 @@
   Verify:   python -m pytest test/test_observe_parse.py -q → 全部通过
   Done:     连写与同行两种格式、双代号族/单代号族、未收录名称、全角拒绝均有测试
 
-- [ ] 3.2 列表页读取器
+- [x] 3.2 列表页读取器
   Goal:     列表页识别结果集 → 完整 ReadResult；硬失败与警告按契约分界
   Read:     docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (契约全文)
             docs/plans/2026-08-29-m2-observe/concept.md:48-72  (§3.1 ReadResult 字段表)
@@ -86,7 +86,7 @@
   Verify:   python -m pytest test/test_observe_list.py -q → 全部通过（内联构造转储样例）
   Done:     合法样例字段全对；每类硬失败与警告样例有断言；无状态有断言
 
-- [ ] 3.3 强化页读取器
+- [x] 3.3 强化页读取器
   Goal:     强化页识别结果集 + 沿用字段 → 完整 ReadResult；面包屑指纹入 extras
   Read:     docs/adr/0005-single-boolean-scene-agnostic.md  (字段分工)
             docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (区域键、CarriedFields)
