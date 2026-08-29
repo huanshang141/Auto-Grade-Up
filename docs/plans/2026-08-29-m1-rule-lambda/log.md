@@ -1,5 +1,18 @@
 # M1 执行日志
 
+## 2026-08-29 · Task 2.2
+- Tried:  （无失败尝试，一次通过）测试先行：test_profile.py 36 例，红灯为导入失败
+- Result: 实现 profile.py 与原神档案后 test_profile.py 36 passed、全量 74 passed
+- Now:    ProfileError 携带 message + 档案路径；GameProfile.stats/slots 为 frozenset
+          （集合语义），rarity_range 二元升序整数组在校验时拆为 rarity_min/rarity_max；
+          KNOWN_ROUND_MECHANISMS 目前仅 staged_fill；validate_artifact 只查值域四项
+          （等级/星级/部位/副词条条数），词条代号合法性不在其中（契约如此，D7 的
+          「不可能组合走缺失语义」也与之呼应）
+- Convention: 代号清单的唯一权威是 assets/resource/genshin/profile.json；
+          test_profile.py 的 GENSHIN_STATS/GENSHIN_SLOTS 常量与真实档案断言相等，
+          档案改动须同步契约与该常量
+
+
 ## 2026-08-29 · 执行前置
 - Tried:  按需求方指令，规划工件先行入库
 - Result: 两笔提交——d152565（ADR-0003/0004 + spec 主文档 + CONTEXT.md + AGENTS.md 定案）、

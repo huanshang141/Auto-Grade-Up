@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "game": "genshin",
+  "display_name": "原神",
+  "stats": [
+    "crit_rate",
+    "crit_dmg",
+    "hp",
+    "hp_percent",
+    "atk",
+    "atk_percent",
+    "def",
+    "def_percent",
+    "elemental_mastery",
+    "energy_recharge",
+    "healing_bonus",
+    "physical_dmg_bonus",
+    "pyro_dmg_bonus",
+    "hydro_dmg_bonus",
+    "electro_dmg_bonus",
+    "cryo_dmg_bonus",
+    "anemo_dmg_bonus",
+    "geo_dmg_bonus",
+    "dendro_dmg_bonus"
+  ],
+  "slots": [
+    "flower",
+    "plume",
+    "sands",
+    "goblet",
+    "circlet"
+  ],
+  "max_level": 20,
+  "roll_interval": 4,
+  "rarity_range": [1, 5],
+  "substat_max": 4,
+  "round_mechanism": "staged_fill"
+}

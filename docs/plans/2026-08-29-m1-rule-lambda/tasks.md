@@ -45,7 +45,7 @@
   Verify:   python -m pytest test/test_model.py -q → 全部通过
   Done:     往返、解析、边界（空串、多空格、百分号、类型错误）均有测试
 
-- [ ] 2.2 游戏档案加载与校验（profile.py）+ 原神档案数据
+- [x] 2.2 游戏档案加载与校验（profile.py）+ 原神档案数据
   Goal:     GameProfile 数据结构、加载与校验、Artifact 值域校验；交付原神档案数据文件
   Read:     specs/game-profile/spec.md  (本变更文件夹内，档案契约全文)
             docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:173-175  (属性代号与游戏档案段)
