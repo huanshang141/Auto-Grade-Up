@@ -51,6 +51,15 @@ class ReadResult:
     warnings: list[str]
 
 
+@dataclass
+class CarriedFields:
+    """强化页读取器的沿用字段：列表初扫读得，单件强化过程中不可能变化（ADR-0005）。"""
+
+    rarity: int
+    set: str
+    locked: bool
+
+
 def split_stat_text(text: str) -> tuple[str, str]:
     """把一行词条文本切分为（词条名文本，数值文本）。
 
@@ -149,6 +158,82 @@ def read_list(recognition: dict, profile: GameProfile, textmap: Textmap) -> Read
         ok=not failures,
         artifact=artifact,
         extras={},
+        confidences=confidences,
+        failures=failures,
+        warnings=warnings,
+    )
+
+
+def read_enhance(
+    recognition: dict, carried: CarriedFields, profile: GameProfile, textmap: Textmap
+) -> ReadResult:
+    """强化页读取器：识别结果集 + 沿用字段 → 圣遗物属性。
+
+    面包屑按「/」切分为部位与圣遗物名（部位参与组装，两者入 extras.fingerprint）；
+    等级、主词条、副词条现场读取；rarity/set/locked 取自 CarriedFields。
+    exp/mora/fodder_tier 为附属读数（只进报告），原样入 extras，缺失不拦截。
+    「待激活」行整行丢弃，与列表页同规则。无状态：同输入两次调用结果相同。
+    """
+    failures: list[str] = []
+    warnings: list[str] = []
+    confidences: dict[str, float] = {}
+
+    for key in _ENHANCE_REQUIRED_REGIONS:
+        if _region_empty(recognition.get(key), template=False):
+            failures.append(f"必要区域缺失或全空：{key}")
+
+    slot = None
+    fingerprint = None
+    crumb_boxes = [
+        b for b in recognition.get("breadcrumb") or [] if strip_spaces(b.get("text", ""))
+    ]
+    if crumb_boxes:
+        confidences["breadcrumb"] = min(box["score"] for box in crumb_boxes)
+        crumb = strip_spaces(_join_text(crumb_boxes))
+        if "/" in crumb:
+            slot_text, _, name_text = crumb.partition("/")
+            slot = textmap.slots.get(slot_text)
+            if slot is None:
+                failures.append(f"部位名未收录对照文档：{slot_text}")
+            else:
+                fingerprint = {"slot": slot, "name": name_text}
+        else:
+            failures.append(f"面包屑不含「/」，无法切分部位与圣遗物名：{crumb}")
+
+    level = _read_level(recognition, failures, confidences)
+    main = _read_main(recognition, textmap, failures, warnings, confidences)
+    substats, row_count = _read_substats(
+        recognition, profile, textmap, failures, warnings, confidences
+    )
+
+    extras: dict = {}
+    for key in ("exp", "mora", "fodder_tier"):
+        boxes = [b for b in recognition.get(key) or [] if strip_spaces(b.get("text", ""))]
+        if boxes:
+            confidences[key] = min(box["score"] for box in boxes)
+            extras[key] = _join_text(boxes)
+    if fingerprint is not None:
+        extras["fingerprint"] = fingerprint
+
+    artifact = None
+    if not failures:
+        artifact = Artifact(
+            slot=slot,
+            rarity=carried.rarity,
+            set=carried.set,
+            level=level,
+            locked=carried.locked,
+            main=main,
+            substats=substats,
+        )
+        count_warning = _substat_count_warning(carried.rarity, level, row_count, profile)
+        if count_warning:
+            warnings.append(count_warning)
+
+    return ReadResult(
+        ok=not failures,
+        artifact=artifact,
+        extras=extras,
         confidences=confidences,
         failures=failures,
         warnings=warnings,
