@@ -1,5 +1,18 @@
 # M1 执行日志
 
+## 2026-08-29 · Task 3.1
+- Tried:  （无失败尝试，一次通过）测试先行：test_schema.py 54 例，红灯为导入失败
+- Result: 实现 schema.py 后 test_schema.py 54 passed、全量 128 passed
+- Now:    运算符常量 NUMERIC_OPS/STRING_OPS/EXISTS 固化于代码（EXISTS 为字符串
+          常量 "exists"）；标量字段分 _NUMERIC_SCALAR_FIELDS（level/rarity/
+          substat_count/remaining_rolls）与 _STRING_FIELDS（slot/set）两组内部
+          常量，main./sub. 代号取自传入档案；RuleValidationError(message,
+          node_path)，顶层键集合错误 node_path 为空串（无节点可定位），节点级
+          错误一律带路径且 str(exc) 含「（位置：路径）」
+- Convention: 校验错误定位统一走 RuleValidationError 的 node_path 属性，
+          任务 5.1 导出生成物与任务 6.1 双端断言沿用同一批样例结构
+
+
 ## 2026-08-29 · Task 2.2
 - Tried:  （无失败尝试，一次通过）测试先行：test_profile.py 36 例，红灯为导入失败
 - Result: 实现 profile.py 与原神档案后 test_profile.py 36 passed、全量 74 passed

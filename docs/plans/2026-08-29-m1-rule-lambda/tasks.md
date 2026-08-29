@@ -78,7 +78,7 @@
 
 ## 3. 格式定义与校验
 
-- [ ] 3.1 规则文件校验（schema.py）
+- [x] 3.1 规则文件校验（schema.py）
   Goal:     权威校验实现：非法规则逐类被拒并定位到节点，合法规则零误拒；代号与值域取自游戏档案
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:115-219  (§4 全节)
             docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:323-337  (§8 编辑器对错误定位的需求)
