@@ -24,7 +24,7 @@
 
 ## 2. 字段对照文档
 
-- [ ] 2.1 对照文档数据文件与加载校验器
+- [x] 2.1 对照文档数据文件与加载校验器
   Goal:     游戏文字到代号的映射可加载即用；每类非法文档逐类被拒
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:177-212  (§4 字段对照文档段与格式示例)
             docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (组装规则节)

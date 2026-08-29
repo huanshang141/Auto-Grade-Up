@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "language": "zh_cn",
+  "stats": {
+    "暴击率": "crit_rate",
+    "暴击伤害": "crit_dmg",
+    "生命值": "hp",
+    "攻击力": "atk",
+    "防御力": "def",
+    "元素精通": "elemental_mastery",
+    "元素充能效率": "energy_recharge",
+    "治疗加成": "healing_bonus",
+    "物理伤害加成": "physical_dmg_bonus",
+    "火元素伤害加成": "pyro_dmg_bonus",
+    "水元素伤害加成": "hydro_dmg_bonus",
+    "雷元素伤害加成": "electro_dmg_bonus",
+    "冰元素伤害加成": "cryo_dmg_bonus",
+    "风元素伤害加成": "anemo_dmg_bonus",
+    "岩元素伤害加成": "geo_dmg_bonus",
+    "草元素伤害加成": "dendro_dmg_bonus"
+  },
+  "slots": {
+    "生之花": "flower",
+    "死之羽": "plume",
+    "时之沙": "sands",
+    "空之杯": "goblet",
+    "理之冠": "circlet"
+  }
+}

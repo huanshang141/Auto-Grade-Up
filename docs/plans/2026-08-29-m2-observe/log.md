@@ -1,5 +1,19 @@
 # M2 执行日志
 
+## 2026-08-29 · Task 2.1
+- Tried:  测试先行：test_textmap.py 24 例，红灯为 ImportError（骨架无 Textmap）
+- Result: 落地数据文件与加载校验器后 test_textmap.py 24 passed、全量 232 passed
+- Now:    数据文件 assets/resource/genshin/textmap/zh_cn.json（词条文字族 16 +
+          部位 5，与主设计文档 §4 示例一致）；Textmap(language, stats, slots)，
+          映射为「文字 → 代号」单向；TextmapError(message, path)，str(exc) 形如
+          「……（对照文档：路径）」；校验顺序：文件缺失/损坏 → 对象 → 键集合 →
+          version → language → 映射节（非空、键与值非空字符串、值在档案清单内；
+          stats 节查 profile.stats、slots 节查 profile.slots，跨节代号被拒）
+- Convention: 非法样例经 tmp_path 临时文件构造（任务 Touch 清单不含夹具目录）；
+          测试内 GENSHIN_STAT_TEXTS/GENSHIN_SLOT_TEXTS 常量与真实文档断言相等，
+          文档改动须同步契约与该常量；language 只做结构校验（非空字符串）不做
+          取值校验——语言不符由启动自检的锚点文字识别发现（spec §4）
+
 ## 2026-08-29 · Task 1.1
 - Tried:  版本对齐核对（契约前置）——MFAAvalonia 最新发布 v2.16.0（2026-08-25），
           其 csproj 钉 Maa.Framework.Runtimes 5.12.3（原生二进制）；PyPI 官方
