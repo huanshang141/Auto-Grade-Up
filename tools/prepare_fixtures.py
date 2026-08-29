@@ -1,8 +1,9 @@
-"""M2 任务 4.1：截图夹具处理——统一缩放到 1280×720、涂黑右下角 UID 后入库。
+"""截图夹具处理——统一缩放到 1280×720、涂黑右下角 UID 后入库。
 
-读 reference/pic/（图1…图7，主干映射为 fig1…fig7）与 reference/pic2/（补拍
-11 张，沿用来源文件名主干 L1…L8、E1…E3）→ 缩放到 1280×720 → 涂黑 UID 区域
-→ 写 test/fixtures/screenshots/。不改动 reference/；处理可重复执行（幂等）。
+M2 任务 4.1 建立；2026-08-29 补强归整为单一来源目录：读 reference/pic/
+（27 张：fig1…fig7 + L1…L8 + E1…E3 + L9…L13 + E4…E7，后续补拍批次
+直接放入该目录）→ 缩放到 1280×720 → 涂黑 UID 区域 → 写
+test/fixtures/screenshots/。不改动 reference/；处理可重复执行（幂等）。
 隐私口径（2026-08-29 定案）：仅遮挡 UID，游戏角色名视为公共内容不遮挡。
 """
 
@@ -15,7 +16,6 @@ from PIL import Image, ImageDraw
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PIC_DIR = REPO_ROOT / "reference/pic"
-PIC2_DIR = REPO_ROOT / "reference/pic2"
 OUT_DIR = REPO_ROOT / "test/fixtures/screenshots"
 
 TARGET_SIZE = (1280, 720)
@@ -25,7 +25,7 @@ UID_MASK_RECT_720 = (1107, 695, 1275, 720)
 
 
 def fixture_stem(path: Path) -> str:
-    """来源文件名主干：pic/ 的「图N-*」映射为 figN，pic2/ 沿用原名主干。"""
+    """来源文件名主干：「图N-*」映射为 figN，其余沿用原名主干。"""
     matched = re.match(r"图(\d+)", path.stem)
     if matched:
         return f"fig{matched.group(1)}"
@@ -33,8 +33,8 @@ def fixture_stem(path: Path) -> str:
 
 
 def prepare() -> list[Path]:
-    sources = sorted(PIC_DIR.glob("*.png")) + sorted(PIC2_DIR.glob("*.png"))
-    assert len(sources) == 18, f"预期 18 张来源截图，实际 {len(sources)}"
+    sources = sorted(PIC_DIR.glob("*.png"))
+    assert len(sources) == 27, f"预期 27 张来源截图，实际 {len(sources)}"
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     outputs = []

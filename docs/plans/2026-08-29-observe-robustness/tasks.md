@@ -12,7 +12,7 @@
 
 ## 1. 截图来源归整与夹具扩展
 
-- [ ] 1.1 四个批次目录合并为 reference/pic/，处理脚本扩到 27 张
+- [x] 1.1 四个批次目录合并为 reference/pic/，处理脚本扩到 27 张
   Goal:     所有测试与开发用图一个目录管理（需求方定案）；27 张夹具处理入库
   Read:     tools/prepare_fixtures.py:16-24  (来源目录常量与张数断言)
             tools/prepare_fixtures.py:27-32  (fixture_stem：图N 映射 figN、

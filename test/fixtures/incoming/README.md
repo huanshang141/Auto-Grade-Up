@@ -12,14 +12,13 @@
 3. 文件名延续现有主干惯例，读取器归属按前缀自动判定：
    列表页 `L<编号>_<说明>.png`（如 `L9_list_locked.png`）、
    强化页 `E<编号>_<说明>.png`（如 `E4_enhance_mid_lv.png`）。
-4. 放入暂存目录或直接放入批次目录（如 `reference/pic3/`）后知会开发方。
+4. 放入暂存目录或直接放入 `reference/pic/` 后知会开发方。
 
 ## 扩测路径（开发方，接手后执行）
 
-1. 把图从暂存目录移入 `reference/pic2/` 或批次目录（第二批为
-   `reference/pic3/`，2026-08-29 已到位）；新建 picN 目录时在
-   `tools/prepare_fixtures.py` 的来源目录清单中加入，并按实际张数调整该
-   脚本的张数断言（当前断言 18 张，加入 pic3 后为 25 张）。
+1. 把图从暂存目录移入 `reference/pic/`——唯一来源目录（2026-08-29 起
+   四个批次已合并，后续批次直接放入、不再开新目录）；按实际张数调整
+   `tools/prepare_fixtures.py` 的张数断言（当前断言 27 张）。
 2. 重跑 `python tools/prepare_fixtures.py` → 新夹具入
    `test/fixtures/screenshots/`（自检尺寸与 UID 遮挡）。
 3. 重跑 `python tools/record_ocr_dumps.py` → 全部转储重新生成（含新图，
@@ -37,7 +36,7 @@
 | G4 | 主词条未覆盖族：暴击率、暴击伤害、元素精通、元素充能效率、治疗加成作主词条无样本 | proposal L3/L4/L7 只覆盖 hp/atk/def 百分比与元素伤害杯 | 第二批补拍覆盖（L11 暴击伤害、L12 元素精通、L13 治疗加成） |
 | G5 | 1~3 星低稀有度无样本 | proposal 补拍清单未要求 | 2026-08-29 需求方定案：本工具不对 1~3 星圣遗物进行强化，无需样本，缺口关闭 |
 
-## 第二批补拍验收记录（reference/pic3，2026-08-29）
+## 补拍验收记录（2026-08-29，两批共九张，已归整至 reference/pic/）
 
 需求方按上一轮建议清单补拍七张（1920×1080，16:9），逐张验收全部合格；
 建议清单中的 L14（3 星）随 G5 关闭不再需要。文件已重命名为带说明主干：
@@ -56,7 +55,7 @@
 
 | 编号 | 界面 | 画面要求 | 覆盖目的 |
 | --- | --- | --- | --- |
-| ~~E6~~ | 强化页 | —— | **已到位**：第三批补拍（reference/pic4）提供 `E6_enhance_lv20_max.png` 与 `E7_enhance_lv4_new_stat.png`，验收记录与设计结论见 `docs/plans/2026-08-29-observe-robustness/discussion.md` 第二轮拷问结果节；E6 等级区域带「MAX」标记、素材区整体消失，入测时按契约断言（等级 20、extras 为空） |
+| ~~E6~~ | 强化页 | —— | **已到位**：第三批补拍提供 `E6_enhance_lv20_max.png` 与 `E7_enhance_lv4_new_stat.png`（已归整至 reference/pic/），验收记录与设计结论见 `docs/plans/2026-08-29-observe-robustness/discussion.md` 第二轮拷问结果节；E6 等级区域带「MAX」标记、素材区整体消失，入测时按契约断言（等级 20、extras 为空） |
 
 ### 后续处理的两个前置事项（入测前必须先处理）
 
