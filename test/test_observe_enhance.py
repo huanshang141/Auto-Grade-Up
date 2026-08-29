@@ -52,10 +52,10 @@ def make_enhance_recognition():
         "level": [make_box("+19", 0.94)],
         "exp": [make_box("2900/35575", 0.93)],
         "substats": [
-            make_box("暴击率 5.8%", 0.92),
-            make_box("攻击力 117", 0.91),
-            make_box("元素精通 23", 0.90),
-            make_box("暴击伤害 12.4%", 0.89),
+            make_box("暴击率 5.8%", 0.92, box=[800, 210, 200, 20]),
+            make_box("攻击力 117", 0.91, box=[800, 245, 200, 20]),
+            make_box("元素精通 23", 0.90, box=[800, 281, 200, 20]),
+            make_box("暴击伤害 12.4%", 0.89, box=[800, 316, 200, 20]),
         ],
         "mora": [make_box("20000", 0.88)],
         "fodder_tier": [make_box("4星及以下素材", 0.87)],
@@ -133,10 +133,10 @@ class TestReadEnhanceRowRules:
         recognition = make_enhance_recognition()
         recognition["level"] = [make_box("+0", 0.94)]
         recognition["substats"] = [
-            make_box("暴击率 5.8%"),
-            make_box("攻击力 117"),
-            make_box("元素精通 23"),
-            make_box("暴击伤害 15.5%（待激活）"),
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+            make_box("元素精通 23", box=[800, 281, 200, 20]),
+            make_box("暴击伤害 15.5%（待激活）", box=[800, 316, 200, 20]),
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
@@ -146,7 +146,10 @@ class TestReadEnhanceRowRules:
     def test_roll_marker_stripped_from_row_tail(self):
         """强化次数标记不参与解析：行尾的 ① 去除后正常切分。"""
         recognition = make_enhance_recognition()
-        recognition["substats"] = [make_box("暴击率 5.8% ①"), make_box("攻击力 117 ②")]
+        recognition["substats"] = [
+            make_box("暴击率 5.8% ①", box=[800, 210, 200, 20]),
+            make_box("攻击力 117 ②", box=[800, 245, 200, 20]),
+        ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.artifact.substats == [
@@ -154,15 +157,33 @@ class TestReadEnhanceRowRules:
             StatValue(name="atk", value=117.0),
         ]
 
+    def test_row_reconstructed_from_split_boxes(self):
+        """真实行形态：名、值、强化次数标记各为一个文字框，同行按横序拼接后解析。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("①", 0.9, box=[780, 210, 16, 18]),
+            make_box("暴击率", 0.9, box=[800, 210, 60, 18]),
+            make_box("3.1%", 0.9, box=[1210, 210, 50, 18]),
+            make_box("②", 0.9, box=[780, 245, 16, 18]),
+            make_box("攻击力", 0.9, box=[800, 245, 60, 18]),
+            make_box("12.8%", 0.9, box=[1210, 245, 50, 18]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=3.1),
+            StatValue(name="atk_percent", value=12.8),
+        ]
+
     def test_marker_only_box_dropped(self):
         """标记独占文字框（OCR 把 ① 单成一行）整行忽略，不算行数也不算解析失败。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
-            make_box("暴击率 5.8%"),
-            make_box("①"),
-            make_box("攻击力 117"),
-            make_box("元素精通 23"),
-            make_box("暴击伤害 12.4%"),
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("①", box=[780, 210, 16, 18]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+            make_box("元素精通 23", box=[800, 281, 200, 20]),
+            make_box("暴击伤害 12.4%", box=[800, 316, 200, 20]),
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
@@ -196,11 +217,11 @@ class TestReadEnhanceFailures:
     def test_substat_count_over_max(self):
         recognition = make_enhance_recognition()
         recognition["substats"] = [
-            make_box("暴击率 5.8%"),
-            make_box("攻击力 117"),
-            make_box("元素精通 23"),
-            make_box("暴击伤害 12.4%"),
-            make_box("生命值 738"),
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+            make_box("元素精通 23", box=[800, 281, 200, 20]),
+            make_box("暴击伤害 12.4%", box=[800, 316, 200, 20]),
+            make_box("生命值 738", box=[800, 351, 200, 20]),
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False
@@ -209,10 +230,10 @@ class TestReadEnhanceFailures:
     def test_duplicate_code_fails(self):
         recognition = make_enhance_recognition()
         recognition["substats"] = [
-            make_box("暴击率 5.8%"),
-            make_box("暴击率 6.6%"),
-            make_box("攻击力 117"),
-            make_box("元素精通 23"),
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("暴击率 6.6%", box=[800, 245, 200, 20]),
+            make_box("攻击力 117", box=[800, 281, 200, 20]),
+            make_box("元素精通 23", box=[800, 316, 200, 20]),
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False

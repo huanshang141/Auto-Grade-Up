@@ -105,7 +105,7 @@
 
 ## 4. 夹具与流水线节点
 
-- [ ] 4.1 截图夹具处理与入库
+- [x] 4.1 截图夹具处理与入库
   Goal:     7 张现有截图统一为 1280×720、涂黑 UID 后入库；补拍清单待收
   Read:     docs/plans/2026-08-29-m2-observe/proposal.md  (补拍清单表)
             docs/plans/2026-08-29-m2-observe/design.md:60-66  (D7)
@@ -120,7 +120,7 @@
           python -c 尺寸断言 1280×720
   Done:     18 张入库、人工抽查无 UID；处理可重复执行（幂等）
 
-- [ ] 4.2 流水线观测节点定义（坐标标定）
+- [x] 4.2 流水线观测节点定义（坐标标定）
   Goal:     两界面全部识别区域落成流水线 JSON，坐标从 720 夹具标定
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:231-272  (§6 两张区域表)
             docs/plans/2026-08-29-m2-observe/specs/observation/spec.md  (流水线节点约定节)

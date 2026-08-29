@@ -50,10 +50,10 @@ def make_list_recognition():
         "main": [make_box("攻击力 31.5%", 0.95)],
         "level": [make_box("+19", 0.94)],
         "substats": [
-            make_box("暴击率+5.8%", 0.93),
-            make_box("攻击力+117", 0.92),
-            make_box("元素精通+23", 0.91),
-            make_box("暴击伤害+12.4%", 0.90),
+            make_box("暴击率+5.8%", 0.93, box=[898, 320, 200, 20]),
+            make_box("攻击力+117", 0.92, box=[898, 345, 200, 20]),
+            make_box("元素精通+23", 0.91, box=[898, 370, 200, 20]),
+            make_box("暴击伤害+12.4%", 0.90, box=[898, 395, 200, 20]),
         ],
         "set": [make_box("辰砂往生录：", 0.89)],
         "stars": [make_box("", 0.88) for _ in range(5)],
@@ -126,10 +126,10 @@ class TestReadListPendingActivationRow:
         recognition = make_list_recognition()
         recognition["level"] = [make_box("+0", 0.94)]
         recognition["substats"] = [
-            make_box("暴击率+5.8%"),
-            make_box("攻击力+117"),
-            make_box("元素精通+23"),
-            make_box("暴击伤害+15.5%（待激活）"),
+            make_box("暴击率+5.8%", box=[898, 320, 200, 20]),
+            make_box("攻击力+117", box=[898, 345, 200, 20]),
+            make_box("元素精通+23", box=[898, 370, 200, 20]),
+            make_box("暴击伤害+15.5%（待激活）", box=[898, 395, 200, 20]),
         ]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
@@ -193,6 +193,36 @@ class TestReadListWarnings:
         assert result.warnings == []
 
 
+class TestReadListMultiBoxRows:
+    """真实界面里名与值常各成一个文字框：按纵坐标聚行、按阅读序拼接。"""
+
+    def test_main_stacked_two_lines(self):
+        """列表页主词条名在上、值在下（两行两框）。"""
+        recognition = make_list_recognition()
+        recognition["main"] = [
+            make_box("攻击力", 0.95, box=[887, 180, 50, 20]),
+            make_box("298", 0.95, box=[887, 200, 60, 30]),
+        ]
+        result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.main == StatValue(name="atk", value=298.0)
+
+    def test_substat_name_value_split_boxes(self):
+        recognition = make_list_recognition()
+        recognition["substats"] = [
+            make_box("暴击率", 0.9, box=[900, 320, 60, 16]),
+            make_box("+3.1%", 0.9, box=[1100, 320, 60, 16]),
+            make_box("攻击力", 0.9, box=[900, 345, 60, 16]),
+            make_box("+117", 0.9, box=[1100, 345, 60, 16]),
+        ]
+        result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=3.1),
+            StatValue(name="atk", value=117.0),
+        ]
+
+
 class TestReadListFailures:
     def test_missing_required_region(self):
         recognition = make_list_recognition()
@@ -234,6 +264,7 @@ class TestReadListFailures:
     def test_unparsable_substat_row(self):
         recognition = make_list_recognition()
         recognition["substats"] = [make_box("暴击率+")] + recognition["substats"][1:]
+        recognition["substats"][0]["box"] = [898, 320, 200, 20]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False
         assert any("副词条" in f for f in result.failures)
@@ -241,11 +272,11 @@ class TestReadListFailures:
     def test_substat_count_over_max(self):
         recognition = make_list_recognition()
         recognition["substats"] = [
-            make_box("暴击率+5.8%"),
-            make_box("攻击力+117"),
-            make_box("元素精通+23"),
-            make_box("暴击伤害+12.4%"),
-            make_box("生命值+738"),
+            make_box("暴击率+5.8%", box=[898, 320, 200, 20]),
+            make_box("攻击力+117", box=[898, 345, 200, 20]),
+            make_box("元素精通+23", box=[898, 370, 200, 20]),
+            make_box("暴击伤害+12.4%", box=[898, 395, 200, 20]),
+            make_box("生命值+738", box=[898, 420, 200, 20]),
         ]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False
@@ -254,10 +285,10 @@ class TestReadListFailures:
     def test_duplicate_code_fails(self):
         recognition = make_list_recognition()
         recognition["substats"] = [
-            make_box("暴击率+5.8%"),
-            make_box("暴击率+6.6%"),
-            make_box("攻击力+117"),
-            make_box("元素精通+23"),
+            make_box("暴击率+5.8%", box=[898, 320, 200, 20]),
+            make_box("暴击率+6.6%", box=[898, 345, 200, 20]),
+            make_box("攻击力+117", box=[898, 370, 200, 20]),
+            make_box("元素精通+23", box=[898, 395, 200, 20]),
         ]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False
@@ -267,10 +298,10 @@ class TestReadListFailures:
         """同文字族的固定值与百分比是两个代号，并存合法（2026-08-29 补拍核验）。"""
         recognition = make_list_recognition()
         recognition["substats"] = [
-            make_box("攻击力+5.8%"),
-            make_box("攻击力+19"),
-            make_box("暴击率+3.1"),
-            make_box("暴击伤害+12.4%"),
+            make_box("攻击力+5.8%", box=[898, 320, 200, 20]),
+            make_box("攻击力+19", box=[898, 345, 200, 20]),
+            make_box("暴击率+3.1", box=[898, 370, 200, 20]),
+            make_box("暴击伤害+12.4%", box=[898, 395, 200, 20]),
         ]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True

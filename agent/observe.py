@@ -38,6 +38,9 @@ _LIST_REQUIRED_REGIONS = ("name", "slot", "main", "level", "substats", "set", "s
 _ENHANCE_REQUIRED_REGIONS = ("breadcrumb", "main", "level", "substats")
 _TEMPLATE_REGIONS = frozenset({"stars", "lock"})
 
+# 行内文字框中心的纵向偏差上界（720 基准）：相邻词条行距约 25~36px
+_ROW_CENTER_TOLERANCE = 14
+
 
 @dataclass
 class ReadResult:
@@ -257,9 +260,32 @@ def _record_confidence(confidences: dict, recognition: dict, key: str) -> None:
 
 
 def _join_text(boxes) -> str:
-    """区域内多文字框按序以空格连接（单框即原文）。"""
-    texts = [box.get("text", "") for box in boxes if strip_spaces(box.get("text", ""))]
+    """区域内多文字框按阅读序（先上后下、先左后右）以空格连接。
+
+    名与值常各成一个文字框：列表页主词条上下两行（名在上、值在下），
+    强化页主词条同行左右（名左值右），按此排序拼接即得行文本。
+    """
+    texts = [
+        box.get("text", "")
+        for box in sorted(boxes, key=lambda b: (b["box"][1], b["box"][0]))
+        if strip_spaces(box.get("text", ""))
+    ]
     return " ".join(texts)
+
+
+def _group_rows(boxes) -> list[list[dict]]:
+    """按文字框中心的纵坐标聚行：同行的名、值、强化次数标记各为一个文字框。"""
+    ordered = sorted(boxes, key=lambda b: (b["box"][1], b["box"][0]))
+    rows: list[list[dict]] = []
+    for box in ordered:
+        center = box["box"][1] + box["box"][3] / 2
+        if rows:
+            centers = [b["box"][1] + b["box"][3] / 2 for b in rows[-1]]
+            if abs(center - sum(centers) / len(centers)) <= _ROW_CENTER_TOLERANCE:
+                rows[-1].append(box)
+                continue
+        rows.append([box])
+    return rows
 
 
 def _read_slot(recognition, textmap, failures, confidences) -> str | None:
@@ -301,7 +327,7 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
         return [], 0
     confidences["substats"] = min(box["score"] for box in raw_boxes)
 
-    rows = _clean_substat_rows(raw_boxes)
+    rows = _clean_substat_rows(_group_rows(raw_boxes))
     if len(rows) > profile.substat_max:
         failures.append(
             f"副词条行数超出档案上限：{len(rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
@@ -320,11 +346,12 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
     return substats, len(rows)
 
 
-def _clean_substat_rows(boxes) -> list[str]:
-    """行级清洗：去强化次数标记；「待激活」预览行与标记独占行整行丢弃。"""
+def _clean_substat_rows(row_groups) -> list[str]:
+    """行级清洗：行内框按横序拼接，去强化次数标记；「待激活」预览行与标记独占行整行丢弃。"""
     rows = []
-    for box in boxes:
-        text = "".join(ch for ch in box.get("text", "") if ch not in _ROLL_MARKERS)
+    for group in row_groups:
+        text = " ".join(box.get("text", "") for box in sorted(group, key=lambda b: b["box"][0]))
+        text = "".join(ch for ch in text if ch not in _ROLL_MARKERS)
         if not text.strip() or "待激活" in text:
             continue
         rows.append(text.strip())
