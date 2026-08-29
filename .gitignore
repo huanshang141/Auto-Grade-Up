@@ -457,3 +457,7 @@ debug
 external/maaframework-docs/
 # 游戏截图真相来源（含 UID 等个人信息，勿入库）
 reference/
+
+# 补拍截图暂存目录（处理前不入库，保留目录本身）
+test/fixtures/incoming/*
+!test/fixtures/incoming/.gitkeep
