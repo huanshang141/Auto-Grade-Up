@@ -166,7 +166,7 @@
   Verify:   python -m pytest test/test_observe_e2e.py -q → 全部通过
   Done:     18 张端到端断言通过；识别质量不达标处记录（replace 调优或该区域退回检测模式）
 
-- [ ] 5.2 断言充实与覆盖缺口标注
+- [x] 5.2 断言充实与覆盖缺口标注
   Goal:     现有夹具断言全绿、覆盖范围如实成文；补拍未到的形态记缺口
   Read:     docs/plans/2026-08-29-m2-observe/proposal.md  (补拍清单)
             docs/plans/2026-08-29-m2-observe/log.md  (既有记录)

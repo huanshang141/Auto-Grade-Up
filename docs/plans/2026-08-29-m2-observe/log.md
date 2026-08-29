@@ -1,5 +1,27 @@
 # M2 执行日志
 
+## 2026-08-29 · Task 5.2
+- Tried:  缺口盘点以 proposal 补拍清单为基准：清单内 L1~L8、E1~E3 全部到位
+          并已入测（5.1），缺口只记清单未覆盖的形态
+- Result: test/fixtures/incoming/README.md 入库（投放方式 + 扩测路径 +
+          缺口清单）；.gitignore 为 README 加白名单（原规则只放行
+          .gitkeep）；全量测试 318 passed
+- Now:    缺口清单六条（逐条对应来源，详表见 incoming/README.md）：
+          G1 锁定样本单一——已锁定仅同一件 5 星死之羽（fig1~fig7），
+          补拍清单未把锁定状态列为变量；G2 4 星仅 +0 一档（L6），
+          L6 画面要求只覆盖 +0；G3 强化页中高等级无独立样本（除 fig2/
+          fig4/fig5 同件 +19 外全部 +0），E1~E3 只要求低等级；G4 主词条
+          未覆盖暴击率/暴击伤害/元素精通/充能效率/治疗加成五族，L3/L4/L7
+          只覆盖 hp/atk/def 百分比与元素伤害杯；G5 物理伤害加成与元素
+          伤害加成作副词条无样本，清单未要求；G6 1~3 星低稀有度无样本，
+          清单未要求。识别质量异常清单仅剩 fig5 fodder_tier 一条（弹窗
+          遮挡，5.1 已按可见范围放宽断言）
+- Convention: 缺口编号 G1~G6 与 README 表格一一对应，补拍落地后按编号
+          销账；扩测路径写入 README（新图经 incoming 暂存 → 移入
+          reference/pic2/ 或新建 picN → 重跑 4.1/4.3 两脚本 → 真值表
+          补行），proposal「放入 incoming/」与契约「放 reference/pic2/
+          或新建 picN」两处口径在 README 中串成同一条链路
+
 ## 2026-08-29 · Task 5.1
 - Tried:  真值表 18 张逐一从截图抄录（L4/L7/L8 套装小字「影中沉凝的幻灭」
           按转储复核确认）；e2e 识别构造直接导入 tools/record_ocr_dumps.py
