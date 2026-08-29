@@ -153,7 +153,7 @@
 
 ## 5. 全链路验收
 
-- [ ] 5.1 离线全链路测试
+- [x] 5.1 离线全链路测试
   Goal:     截图 → 框架识别 → 解析核心 → 断言，端到端通过
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:440  (spec §14 M2 验收)
             docs/plans/2026-08-29-m2-observe/concept.md:100-110  (§6 两层测试)

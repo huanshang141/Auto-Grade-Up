@@ -1,5 +1,32 @@
 # M2 执行日志
 
+## 2026-08-29 · Task 5.1
+- Tried:  真值表 18 张逐一从截图抄录（L4/L7/L8 套装小字「影中沉凝的幻灭」
+          按转储复核确认）；e2e 识别构造直接导入 tools/record_ocr_dumps.py
+          （PEP 420 命名空间包可导入），Resource 加载与 Tasker 绑定整模块
+          共享一次（fixture scope=module，18 张 × 15 节点约 12 秒跑完）
+- Result: test_observe_e2e.py 18 用例全绿：17 张全字段断言（覆盖 L5 主词条
+          3967 千位逗号、L1/E1/E2「待激活」行整行丢弃、L2/L8 同族双代号
+          并存、L6 四星 2 词条与套装块效果残留行取最上一行、fig1~fig7
+          锁定模板命中）；fig5 按可见范围放宽——放入设置弹窗盖住主词条名
+          与副词条名，5 行只剩数值、逐行按契约入 failures（ok=False、
+          artifact=None），弹窗外可见字段（面包屑切分、等级、exp、摩拉）
+          照常断言，fodder_tier 区域为空。全量 318 passed
+- Now:    识别质量调优一处：面包屑节点 replace 增去半角「.」与「，」
+          （E1 面包屑 OCR 幻觉「生之花/.止于荣礼的缎彩」、fig5 尾逗号；
+          两处都进指纹的圣遗物名，会破坏 M3 指纹核对）；重录 18 份转储，
+          仅面包屑两处文本变化、其余逐字节一致（顺带验证 OCR 推理确定性，
+          e2e 与录制可互为印证）
+- Convention: (1) 冒烟守卫子进程化——e2e 层导入 maa 后，同进程的
+          「"maa" not in sys.modules」断言被先前测试污染（字母序 e2e 先于
+          smoke，全量必挂），两个冒烟（解析核心、决策机构）改为独立子进程
+          断言；语义不变，concept §3.1「导入解析核心后 maa 不在 sys.modules」
+          即干净进程语义。(2) 摩拉读数 OCR 尾逗号（fig2「需要0，」）不调优：
+          extras 契约原样入模、只进报告，e2e 以正则断言需要数为 0。
+          (3) fig4 判定为全绿夹具：素材档位下拉弹窗只盖素材槽与强化消耗行，
+          不触及右栏词条与摩拉读数，全字段照常断言（风险表两处遮挡形态
+          只有 fig5 需要放宽）
+
 ## 2026-08-29 · Task 4.3
 - Tried:  先读 maa 绑定源码定 API（post_recognition(JRecognitionType, JRecognitionParam,
           BGR ndarray) → TaskJob → task detail → node detail → RecognitionDetail）；
