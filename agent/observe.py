@@ -15,7 +15,16 @@
 
 from __future__ import annotations
 
-from agent.rule_lambda.model import parse_stat_value, strip_spaces
+from dataclasses import dataclass
+
+from agent.rule_lambda.model import (
+    Artifact,
+    StatValue,
+    parse_level,
+    parse_stat_value,
+    strip_spaces,
+)
+from agent.rule_lambda.profile import GameProfile
 from agent.textmap import Textmap
 
 # 固定值与百分比共用一条文字族代号的双代号族：按 % 后缀落 _percent 代号
@@ -23,6 +32,23 @@ _DUAL_CODE_FAMILIES = frozenset({"hp", "atk", "def"})
 
 # 强化次数标记（契约：不参与解析）；OCR 可能把它并进行尾或单成一行
 _ROLL_MARKERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+
+# 各读取器的必要区域（缺失或全空 → 读取失败）；stars/lock 为模板匹配区域
+_LIST_REQUIRED_REGIONS = ("name", "slot", "main", "level", "substats", "set", "stars")
+_ENHANCE_REQUIRED_REGIONS = ("breadcrumb", "main", "level", "substats")
+_TEMPLATE_REGIONS = frozenset({"stars", "lock"})
+
+
+@dataclass
+class ReadResult:
+    """一次读取的整体结果；failures 非空即读取失败（artifact 为 None）。"""
+
+    ok: bool
+    artifact: Artifact | None
+    extras: dict
+    confidences: dict[str, float]
+    failures: list[str]
+    warnings: list[str]
 
 
 def split_stat_text(text: str) -> tuple[str, str]:
@@ -68,6 +94,200 @@ def adapt_stat(name_text: str, value_text: str, textmap: Textmap) -> tuple[str, 
     if family in _DUAL_CODE_FAMILIES and is_percent:
         return (f"{family}_percent", True)
     return (family, True)
+
+
+def read_list(recognition: dict, profile: GameProfile, textmap: Textmap) -> ReadResult:
+    """列表页读取器：右栏预览识别结果集 → 圣遗物属性。
+
+    星级 = stars 区域命中数；锁定 = lock 区域有命中；其余字段取 OCR。
+    「待激活」预览行整行丢弃；硬失败与警告的分界见 observation 契约
+    「未知与缺失语义」。无状态：同输入两次调用结果相同，不修改输入。
+    """
+    failures: list[str] = []
+    warnings: list[str] = []
+    confidences: dict[str, float] = {}
+
+    for key in _LIST_REQUIRED_REGIONS:
+        if _region_empty(recognition.get(key), template=key in _TEMPLATE_REGIONS):
+            failures.append(f"必要区域缺失或全空：{key}")
+
+    # 名称：必要区域（确认右栏可见与置信度），圣遗物名不入数据模型
+    _record_confidence(confidences, recognition, "name")
+    slot = _read_slot(recognition, textmap, failures, confidences)
+    level = _read_level(recognition, failures, confidences)
+    main = _read_main(recognition, textmap, failures, warnings, confidences)
+    substats, row_count = _read_substats(recognition, profile, textmap, failures, warnings, confidences)
+    set_name = _read_set(recognition, confidences)
+
+    stars = recognition.get("stars") or []
+    if stars:
+        _record_confidence(confidences, recognition, "stars")
+    rarity = len(stars) if stars else None
+
+    locked = False
+    lock_boxes = recognition.get("lock") or []
+    if lock_boxes:
+        confidences["lock"] = min(box["score"] for box in lock_boxes)
+        locked = True
+
+    artifact = None
+    if not failures:
+        artifact = Artifact(
+            slot=slot,
+            rarity=rarity,
+            set=set_name,
+            level=level,
+            locked=locked,
+            main=main,
+            substats=substats,
+        )
+        count_warning = _substat_count_warning(rarity, level, row_count, profile)
+        if count_warning:
+            warnings.append(count_warning)
+
+    return ReadResult(
+        ok=not failures,
+        artifact=artifact,
+        extras={},
+        confidences=confidences,
+        failures=failures,
+        warnings=warnings,
+    )
+
+
+def _region_empty(boxes, template: bool) -> bool:
+    """必要区域判定：键缺失、无文字框，或（OCR 区域）文字框全部无有效文字。"""
+    if not boxes:
+        return True
+    if template:
+        return False
+    return not any(strip_spaces(box.get("text", "")) for box in boxes)
+
+
+def _record_confidence(confidences: dict, recognition: dict, key: str) -> None:
+    """逐字段置信度 = 该区域所用文字框分数的最小值；区域无框则不记。"""
+    boxes = recognition.get(key) or []
+    if boxes:
+        confidences[key] = min(box["score"] for box in boxes)
+
+
+def _join_text(boxes) -> str:
+    """区域内多文字框按序以空格连接（单框即原文）。"""
+    texts = [box.get("text", "") for box in boxes if strip_spaces(box.get("text", ""))]
+    return " ".join(texts)
+
+
+def _read_slot(recognition, textmap, failures, confidences) -> str | None:
+    boxes = [b for b in recognition.get("slot") or [] if strip_spaces(b.get("text", ""))]
+    if not boxes:
+        return None
+    confidences["slot"] = min(box["score"] for box in boxes)
+    slot_text = _join_text(boxes)
+    slot = textmap.slots.get(strip_spaces(slot_text))
+    if slot is None:
+        failures.append(f"部位名未收录对照文档：{slot_text}")
+    return slot
+
+
+def _read_level(recognition, failures, confidences) -> int | None:
+    boxes = [b for b in recognition.get("level") or [] if strip_spaces(b.get("text", ""))]
+    if not boxes:
+        return None
+    confidences["level"] = min(box["score"] for box in boxes)
+    try:
+        return parse_level(_join_text(boxes))
+    except ValueError:
+        failures.append(f"无法解析等级：{_join_text(boxes)!r}")
+        return None
+
+
+def _read_main(recognition, textmap, failures, warnings, confidences) -> StatValue | None:
+    boxes = [b for b in recognition.get("main") or [] if strip_spaces(b.get("text", ""))]
+    if not boxes:
+        return None
+    confidences["main"] = min(box["score"] for box in boxes)
+    return _parse_stat_row(_join_text(boxes), textmap, failures, warnings, "主词条")
+
+
+def _read_substats(recognition, profile, textmap, failures, warnings, confidences):
+    """解析副词条各行；返回 (StatValue 列表, 待激活丢弃后的行数)。"""
+    raw_boxes = [b for b in recognition.get("substats") or [] if strip_spaces(b.get("text", ""))]
+    if not raw_boxes:
+        return [], 0
+    confidences["substats"] = min(box["score"] for box in raw_boxes)
+
+    rows = _clean_substat_rows(raw_boxes)
+    if len(rows) > profile.substat_max:
+        failures.append(
+            f"副词条行数超出档案上限：{len(rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
+        )
+
+    substats = []
+    for row in rows:
+        stat = _parse_stat_row(row, textmap, failures, warnings, "副词条")
+        if stat is not None:
+            substats.append(stat)
+
+    codes = [stat.name for stat in substats]
+    for code in sorted({c for c in codes if codes.count(c) > 1}):
+        failures.append(f"副词条代号重复：{code}")
+
+    return substats, len(rows)
+
+
+def _clean_substat_rows(boxes) -> list[str]:
+    """行级清洗：去强化次数标记；「待激活」预览行与标记独占行整行丢弃。"""
+    rows = []
+    for box in boxes:
+        text = "".join(ch for ch in box.get("text", "") if ch not in _ROLL_MARKERS)
+        if not text.strip() or "待激活" in text:
+            continue
+        rows.append(text.strip())
+    return rows
+
+
+def _parse_stat_row(row_text, textmap, failures, warnings, label) -> StatValue | None:
+    """一行词条 → StatValue；切分或解析异常记入 failures，未收录记入 warnings 并存原文。"""
+    try:
+        name_text, value_text = split_stat_text(row_text)
+        code, collected = adapt_stat(name_text, value_text, textmap)
+        value, _ = parse_stat_value(value_text)
+    except ValueError:
+        failures.append(f"{label}行无法解析：{row_text}")
+        return None
+    if not collected:
+        warnings.append(f"{label}名未收录对照文档，按原文存入：{code}")
+    return StatValue(name=code, value=value)
+
+
+def _read_set(recognition, confidences) -> str | None:
+    """套装名取游戏原文（不经对照文档）；显示行的冒号后缀不入模。"""
+    boxes = [b for b in recognition.get("set") or [] if strip_spaces(b.get("text", ""))]
+    if not boxes:
+        return None
+    confidences["set"] = min(box["score"] for box in boxes)
+    return strip_spaces(_join_text(boxes)).rstrip("：:")
+
+
+def _substat_count_warning(rarity, level, count, profile) -> str | None:
+    """行数与等级、稀有度的一致性提示（不拦截）；低稀有度合法形态未定，不提示。"""
+    expectation = _legal_substat_counts(rarity, level, profile)
+    if expectation is not None and count not in expectation:
+        return f"副词条行数与等级、稀有度不一致：{count} 条（{rarity} 星 +{level}）"
+    return None
+
+
+def _legal_substat_counts(rarity, level, profile):
+    """各稀有度在当前等级的合法副词条行数（2026-08-29 补拍核验的界面事实：
+    4 星 +0 为 2 条、5 星 +0 为 3~4 条；每经过一个词条变动点解锁一条）。"""
+    if rarity == 5:
+        if level < profile.roll_interval:
+            return frozenset({3, 4})
+        return frozenset({4})
+    if rarity == 4:
+        unlocked = min(level // profile.roll_interval, 2)
+        return frozenset({2 + unlocked})
+    return None
 
 
 def _has_digit(text: str) -> bool:
