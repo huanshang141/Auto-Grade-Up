@@ -6,7 +6,7 @@
 
 ## 1. 骨架与依赖
 
-- [ ] 1.1 maa 开发依赖与解析核心骨架
+- [x] 1.1 maa 开发依赖与解析核心骨架
   Goal:     maa 绑定就绪（钉版本、版本对齐核对），observe/textmap 骨架可导入，maa 隔离有测试兜底
   Read:     docs/plans/2026-08-29-m2-observe/concept.md:24-46  (§3.1 禁止导入 maa 的理由)
             docs/plans/2026-08-29-m2-observe/design.md:5-14  (D1)
