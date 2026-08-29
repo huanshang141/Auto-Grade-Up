@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "game": "second_game",
+  "name": "非法样本：game 与运行时游戏档案错配",
+  "candidates": { "rarity": [5], "slots": [], "max_level": 20, "respect_lock": true },
+  "rule": { "all": [] },
+  "fodder": { "strategy": "staged_fill", "respect_lock": true }
+}

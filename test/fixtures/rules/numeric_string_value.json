@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "game": "genshin",
+  "name": "非法样本：数值字段给字符串值",
+  "candidates": { "rarity": [5], "slots": [], "max_level": 20, "respect_lock": true },
+  "rule": { "all": [{ "field": "level", "op": "==", "value": "5" }] },
+  "fodder": { "strategy": "staged_fill", "respect_lock": true }
+}

@@ -1,5 +1,21 @@
 # M1 执行日志
 
+## 2026-08-29 · Task 6.1
+- Tried:  首版 test_acceptance.py 把示例规则并列进参数化合法样本又另设一条
+          身份断言测试，合计 15 passed，与契约 Verify「14 passed」不符
+- Result: 拆开——示例规则单独一条测试（含 game/name 身份断言，覆盖空 slots
+          与多层嵌套两类合法形态），内联合法样本参数化 4 条，非法夹具参数化
+          9 条，合计恰好 14 passed；全量 207 passed
+- Now:    合法样本 5（示例、exists 叶子、两层嵌套、字符串相等、仅标量）、
+          非法样本 9（未知字段、字符串用数值运算符、exists 带 value、档案外
+          代号、version 不为 1、game 错配、节点键混用、数值给字符串、strategy
+          非法）；每个样本双端断言（validate 与 Draft202012Validator 结论一致
+          且符合预期）；曾疑似 exists_with_value.json 顶层键笔误，经脚本核对
+          为误报
+- Convention: 非法样本一律单一违规（其余部分合法），保证失败定位干净；
+          双端等价以后续新增样本进 test_acceptance.py 为准
+
+
 ## 2026-08-29 · 代码评审轮（子代理评审 + 修复）
 - Tried:  子代理逐条契约核对（基线 169 passed），报 0 阻塞、2 主要（M1 浮点整数
           双端分歧、M2 CLI 测试编码脆弱）、6 次要；本人用探针复核 M1 成立

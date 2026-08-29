@@ -151,7 +151,7 @@
 
 ## 6. 验收
 
-- [ ] 6.1 示例规则、样本集与双端一致性验收
+- [x] 6.1 示例规则、样本集与双端一致性验收
   Goal:     M1 三条验收标准全部满足，双端等价有测试固化
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:118-148  (§4 示例规则)
             docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:440  (M1 验收标准)

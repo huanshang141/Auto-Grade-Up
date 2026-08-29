@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "game": "genshin",
+  "name": "非法样本：组节点与叶子键混用",
+  "candidates": { "rarity": [5], "slots": [], "max_level": 20, "respect_lock": true },
+  "rule": { "all": [], "field": "level", "op": "exists" },
+  "fodder": { "strategy": "staged_fill", "respect_lock": true }
+}
