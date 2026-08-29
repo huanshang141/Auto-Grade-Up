@@ -1,5 +1,18 @@
 # M1 执行日志
 
+## 2026-08-29 · Task 4.1
+- Tried:  （无失败尝试，一次通过）测试先行：test_evaluate.py 28 例，红灯为导入失败
+- Result: 实现 evaluate.py 后 test_evaluate.py 28 passed、全量 156 passed
+- Now:    evaluate 的 rule 参数是条件树（rule 键的值），不是整个规则文件
+          （judgment 契约输入原文「条件树」）；字段缺失用模块级不可变哨兵
+          _MISSING 表示，trace 里落为字符串 "missing"；remaining_rolls 用整数
+          向上取整 -((level − max_level) // interval)，无浮点除法；EXISTS 从
+          schema 导入（运算符常量单一来源）
+- Convention: trace 键按 spec 顺序构造（kind/passed/field/op/[value]/actual），
+          报告序列化字节稳定；求值只依赖 schema.validate 过的输入，
+          未知字段/运算符抛 ValueError 属防御性兜底，不构成语义
+
+
 ## 2026-08-29 · Task 3.1
 - Tried:  （无失败尝试，一次通过）测试先行：test_schema.py 54 例，红灯为导入失败
 - Result: 实现 schema.py 后 test_schema.py 54 passed、全量 128 passed

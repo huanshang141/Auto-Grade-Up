@@ -103,7 +103,7 @@
 
 ## 4. 求值
 
-- [ ] 4.1 条件树求值与 trace（evaluate.py）
+- [x] 4.1 条件树求值与 trace（evaluate.py）
   Goal:     ADR-0003 的无状态求值语义完整落地，每个判定可解释、可重放；公式按档案参数化
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:214-229  (判定执行时机 + §5)
             docs/adr/0003-single-rule-set-stateless-judgment.md  (无状态与重复扫到语义)
