@@ -182,7 +182,7 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 M2 验收对照与契约折叠
+- [x] 6.1 M2 验收对照与契约折叠
   Goal:     M2 验收标准逐条对照达成；行为契约折叠为正本
   Read:     docs/superpowers/specs/2026-08-28-auto-grade-up-design.md:440  (spec §14 M2)
             docs/specs/  (正本惯例)
