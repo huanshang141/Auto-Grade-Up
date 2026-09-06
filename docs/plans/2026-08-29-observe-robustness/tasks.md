@@ -85,7 +85,7 @@
 
 ## 4. 九张真值表补行与全量回归
 
-- [ ] 4.1 L9~L13、E4~E7 端到端断言
+- [x] 4.1 L9~L13、E4~E7 端到端断言
   Goal:     27 张夹具离线全链路全绿
   Read:     test/test_observe_e2e.py  (LIST_TRUTH 与 ENHANCE_TRUTH 结构、
             recognize fixture、fig5 放宽断言先例)

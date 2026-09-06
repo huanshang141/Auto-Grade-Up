@@ -173,6 +173,60 @@ LIST_TRUTH = [
         # 防御力百分比与固定值并存（同族双代号合法）
         [("crit_dmg", 7.8), ("def_percent", 7.3), ("elemental_mastery", 19.0), ("def", 19.0)],
     ),
+    # —— 2026-08-29 第二、三批补拍（真值来源：README 验收记录）——
+    (
+        "L9_list_locked_lv20",
+        "plume",
+        5,
+        "纺月的夜歌",
+        20,
+        True,
+        ("atk", 311.0),
+        # +20 满级形态；列表页无「MAX」标记（仅强化页有）
+        [("crit_dmg", 13.2), ("energy_recharge", 10.4), ("hp", 209.0), ("crit_rate", 9.7)],
+    ),
+    (
+        "L10_list_4star_lv16",
+        "flower",
+        4,
+        "教官",
+        16,
+        True,
+        ("hp", 3571.0),  # 4 星主词条也有千位逗号
+        # 攻击力百分比与固定值并存（同族双代号合法）
+        [("atk", 11.0), ("energy_recharge", 5.2), ("atk_percent", 8.4), ("elemental_mastery", 30.0)],
+    ),
+    (
+        "L11_list_crit_dmg_circlet",
+        "circlet",
+        5,
+        "影中沉凝的幻灭",
+        20,
+        True,
+        ("crit_dmg", 62.2),
+        [("atk_percent", 11.1), ("energy_recharge", 9.7), ("crit_rate", 9.7), ("hp_percent", 4.7)],
+    ),
+    (
+        "L12_list_em_sands",
+        "sands",
+        5,
+        "黄金剧团",
+        20,
+        True,
+        ("elemental_mastery", 187.0),
+        [("crit_dmg", 7.8), ("crit_rate", 5.4), ("atk", 56.0), ("hp", 418.0)],
+    ),
+    (
+        "L13_list_healing_circlet",
+        "circlet",
+        5,
+        "影中沉凝的幻灭",
+        0,
+        False,
+        ("healing_bonus", 5.4),
+        # 生命值百分比与固定值并存；第 4 行「攻击力 4.7%（待激活）」整行丢弃
+        [("hp_percent", 4.7), ("atk", 18.0), ("hp", 209.0)],
+    ),
 ]
 
 # 真值表（2026-08-29 逐一从截图抄录）。强化页：星级、套装、锁定为沿用字段
@@ -231,6 +285,56 @@ ENHANCE_TRUTH = [
         ("hp", 717.0),
         [("def", 21.0), ("elemental_mastery", 21.0), ("crit_rate", 3.9), ("energy_recharge", 4.5)],
         "0/3000",
+    ),
+    # —— 2026-08-29 第二、三批补拍（真值来源：README 验收记录）——
+    (
+        "E4_enhance_lv16_marks",
+        # 套装名强化页不显示、未从列表页采样——沿字段原样传递、不经校验（design D6）
+        CarriedFields(rarity=5, set="（E4 套装未采样）", locked=False),
+        "circlet",
+        "魔战士的羽面",
+        16,
+        ("crit_dmg", 51.6),
+        # 四条副词条均带强化次数标记 ①（5 星 +16 四次成长各一次），剥离后解析
+        [("hp", 508.0), ("crit_rate", 5.8), ("atk_percent", 9.9), ("def_percent", 13.9)],
+        "280/23500",
+    ),
+    (
+        "E5_enhance_lv8_preview",
+        CarriedFields(rarity=4, set="教官", locked=False),
+        "flower",
+        "教官的胸花",
+        8,
+        ("hp", 2108.0),  # 主词条千位逗号
+        # 第 4 行「防御力 5.8% → 11.1% ↑」为成长结算形态，取新值；面包屑分隔符
+        # 被 OCR 读丢，按部位名前缀匹配切分（契约修订）
+        [("crit_dmg", 4.4), ("elemental_mastery", 15.0), ("hp_percent", 3.7), ("def_percent", 11.1)],
+        "1700/7375",
+    ),
+    (
+        "E6_enhance_lv20_max",
+        CarriedFields(rarity=5, set="影中沉凝的幻灭", locked=False),
+        "sands",
+        "止于宏伟梦醒的时刻",
+        20,
+        ("energy_recharge", 51.8),
+        # ①暴击率「3.5% → 6.6% ↑」结算行取新值；③生命值 18.1%；标记被误读为
+        # 「0」「3」由解析层剥离；满级形态 exp 传 None——经验条无数字、素材区
+        # 整体消失（契约），extras 仅剩指纹
+        [("crit_dmg", 6.2), ("hp", 269.0), ("crit_rate", 6.6), ("hp_percent", 18.1)],
+        None,
+    ),
+    (
+        "E7_enhance_lv4_new_stat",
+        CarriedFields(rarity=5, set="（E7 套装未采样）", locked=False),
+        "goblet",
+        "绯花之壶",
+        4,
+        ("geo_dmg_bonus", 14.9),
+        # 第 4 行「新 攻击力 4.7%」为新解锁词条（「新」角标剥离）；星级 5 由
+        # 三初始词条 + +4 解锁第 4 条的节奏实证
+        [("crit_rate", 2.7), ("crit_dmg", 6.2), ("def", 21.0), ("atk_percent", 4.7)],
+        "1200/5900",
     ),
 ]
 
@@ -321,10 +425,15 @@ class TestEnhanceEndToEnd:
         assert artifact.locked is carried.locked
         assert artifact.main == StatValue(name=main[0], value=main[1])
         assert_stat_rows(artifact.substats, substats)
-        assert result.extras["exp"] == exp
-        assert result.extras["fodder_tier"] == FODDER_TIER_TEXT
-        assert re.fullmatch(MORA_PATTERN, result.extras["mora"])
-        assert result.extras["fingerprint"] == {"slot": slot, "name": name}
+        if exp is None:
+            # 满级强化页（E6）：经验条无数字、素材档位与摩拉区域整体消失
+            # （契约），附属读数仅剩指纹
+            assert result.extras == {"fingerprint": {"slot": slot, "name": name}}
+        else:
+            assert result.extras["exp"] == exp
+            assert result.extras["fodder_tier"] == FODDER_TIER_TEXT
+            assert re.fullmatch(MORA_PATTERN, result.extras["mora"])
+            assert result.extras["fingerprint"] == {"slot": slot, "name": name}
         assert min(result.confidences.values()) >= 0.6
 
 
