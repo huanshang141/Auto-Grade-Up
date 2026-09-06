@@ -158,6 +158,70 @@
       "score": 0.999996
     }
   ],
+  "roll_marks": [
+    {
+      "box": [
+        776,
+        277,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_1.png",
+      "score": 0.991066
+    },
+    {
+      "box": [
+        776,
+        312,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_3.png",
+      "score": 0.999999
+    }
+  ],
+  "roll_marks_ocr": [
+    {
+      "box": [
+        778,
+        208,
+        41,
+        22
+      ],
+      "text": "·暴",
+      "score": 0.829011
+    },
+    {
+      "box": [
+        780,
+        242,
+        40,
+        22
+      ],
+      "text": "·生",
+      "score": 0.773859
+    },
+    {
+      "box": [
+        775,
+        278,
+        44,
+        22
+      ],
+      "text": "①暴",
+      "score": 0.884944
+    },
+    {
+      "box": [
+        776,
+        313,
+        44,
+        22
+      ],
+      "text": "③生",
+      "score": 0.996711
+    }
+  ],
   "mora": [],
   "fodder_tier": []
 }

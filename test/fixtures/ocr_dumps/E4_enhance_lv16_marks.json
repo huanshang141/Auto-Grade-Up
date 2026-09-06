@@ -149,6 +149,90 @@
       "score": 0.999995
     }
   ],
+  "roll_marks": [
+    {
+      "box": [
+        776,
+        207,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_1.png",
+      "score": 0.9876
+    },
+    {
+      "box": [
+        776,
+        242,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_1.png",
+      "score": 0.999999
+    },
+    {
+      "box": [
+        776,
+        277,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_1.png",
+      "score": 0.982322
+    },
+    {
+      "box": [
+        776,
+        312,
+        22,
+        22
+      ],
+      "text": "genshin/roll_mark/roll_mark_1.png",
+      "score": 0.961948
+    }
+  ],
+  "roll_marks_ocr": [
+    {
+      "box": [
+        776,
+        208,
+        44,
+        22
+      ],
+      "text": "①生",
+      "score": 0.917372
+    },
+    {
+      "box": [
+        770,
+        243,
+        50,
+        21
+      ],
+      "text": "①暴",
+      "score": 0.739897
+    },
+    {
+      "box": [
+        776,
+        278,
+        44,
+        22
+      ],
+      "text": "①攻",
+      "score": 0.802925
+    },
+    {
+      "box": [
+        777,
+        313,
+        43,
+        22
+      ],
+      "text": "①防",
+      "score": 0.937632
+    }
+  ],
   "mora": [
     {
       "box": [

@@ -34,10 +34,9 @@ from tools.record_ocr_dumps import (
     PIPELINE_JSON,
     RESOURCE_DIR,
     SCREENSHOT_DIR,
-    build_param,
     check_shape,
     reader_of,
-    to_boxes,
+    run_region,
 )
 
 PROFILE = load_profile("assets/resource/genshin/profile.json")
@@ -243,9 +242,10 @@ ENHANCE_TRUTH = [
         "黄金飞鸟的落羽",
         19,
         ("atk", 298.0),
-        # ②攻击力（同框 Unicode 形态）→ 次数 2
+        # ②攻击力（同框 Unicode）双通道：模板无 ② 素材 → 单通道降级 + 警告；
+        # 生命值 ① 仅模板通道命中（1 倍整图丢框、放大 OCR 亦漏读，fig2 实测）
         [("crit_rate", 3.1, 0, False), ("atk_percent", 12.8, 2, False),
-         ("hp_percent", 11.1, 0, False), ("crit_dmg", 7.0, 0, False)],
+         ("hp_percent", 11.1, 1, False), ("crit_dmg", 7.0, 0, False)],
         "2900/35575",
     ),
     (
@@ -255,9 +255,9 @@ ENHANCE_TRUTH = [
         "黄金飞鸟的落羽",
         19,
         ("atk", 298.0),
-        # 同 fig2
+        # 同 fig2（fig4 的生命值 ① 双通道一致命中，警告仅攻击力一条）
         [("crit_rate", 3.1, 0, False), ("atk_percent", 12.8, 2, False),
-         ("hp_percent", 11.1, 0, False), ("crit_dmg", 7.0, 0, False)],
+         ("hp_percent", 11.1, 1, False), ("crit_dmg", 7.0, 0, False)],
         "2900/35575",
     ),
     (
@@ -304,11 +304,11 @@ ENHANCE_TRUTH = [
         "魔战士的羽面",
         16,
         ("crit_dmg", 51.6),
-        # 四条副词条均带强化次数标记 ①：生命值行 Unicode 同框（1）；暴击率行
-        # 标记被误读为「0」（次数记未知 + 警告，M2.5 双通道到位后由交叉修复）；
-        # 攻击力、防御力行标记整体丢失（1 倍整图，暂记 0）
-        [("hp", 508.0, 1, False), ("crit_rate", 5.8, None, False),
-         ("atk_percent", 9.9, 0, False), ("def_percent", 13.9, 0, False)],
+        # 四条副词条均带强化次数标记 ①（5 星 +16 四次成长各一次）：行内同框、
+        # 放大 OCR、模板通道三处一致命中（1 倍整图的丢框与误读形态全部被
+        # 双通道修复，M2.5 起无警告）
+        [("hp", 508.0, 1, False), ("crit_rate", 5.8, 1, False),
+         ("atk_percent", 9.9, 1, False), ("def_percent", 13.9, 1, False)],
         "280/23500",
     ),
     (
@@ -331,11 +331,11 @@ ENHANCE_TRUTH = [
         "止于宏伟梦醒的时刻",
         20,
         ("energy_recharge", 51.8),
-        # ①暴击率「3.5% → 6.6% ↑」结算行取新值、③生命值 18.1%——标记均被
-        # 误读为「0」「3」（次数记未知 + 警告，M2.5 双通道到位后由交叉修复）；
+        # ①暴击率「3.5% → 6.6% ↑」结算行取新值、③生命值 18.1%——1 倍整图
+        # 误读为「0」「3」的标记由双通道修复（放大 OCR 与模板通道一致命中）；
         # 满级形态 exp 传 None——经验条无数字、素材区整体消失（契约）
         [("crit_dmg", 6.2, 0, False), ("hp", 269.0, 0, False),
-         ("crit_rate", 6.6, None, False), ("hp_percent", 18.1, None, False)],
+         ("crit_rate", 6.6, 1, False), ("hp_percent", 18.1, 3, False)],
         None,
     ),
     (
@@ -353,15 +353,17 @@ ENHANCE_TRUTH = [
     ),
 ]
 
-# 次数标记被误读为行首数字的夹具 → 该页警告条数（M2.5 D7 防御层；均为「误读」警告）
-ENHANCE_MISREAD_WARNINGS = {"E4_enhance_lv16_marks": 1, "E6_enhance_lv20_max": 2}
+# 交叉警告期望（D6 单通道降级）：夹具 → 该页警告条数（均为「单通道」警告；
+# E4/E6 双通道一致无警告，1 倍整图的丢框与误读形态全部被修复）
+ENHANCE_CROSS_WARNINGS = {"fig2": 2, "fig4": 1}
 
 
 @pytest.fixture(scope="module")
 def recognize():
-    """整模块共享一次资源加载；逐节点识别路径与 tools/record_ocr_dumps.py 相同。"""
+    """整模块共享一次资源加载；逐节点识别路径与 tools/record_ocr_dumps.py 相同
+    （run_region：双通道区域走放大 OCR 与逐模板标注的专属录制逻辑）。"""
     nodes = json.loads(PIPELINE_JSON.read_text(encoding="utf-8"))
-    assert len(nodes) == 15, f"预期 15 个识别节点，实际 {len(nodes)}"
+    assert len(nodes) == 17, f"预期 17 个识别节点，实际 {len(nodes)}"
 
     resource = Resource()
     load = resource.post_bundle(RESOURCE_DIR)
@@ -374,15 +376,10 @@ def recognize():
         reader = reader_of(stem)
         regions = LIST_REGIONS if reader == "list" else ENHANCE_REGIONS
         with Image.open(SCREENSHOT_DIR / f"{stem}.png") as im:
-            image = np.ascontiguousarray(np.array(im.convert("RGB"))[:, :, ::-1])
+            image = np.ascontiguousarray(np.array(im.convert("RGB")))[:, :, ::-1]
         dump: dict[str, list[dict]] = {}
         for region in regions:
-            node = nodes[f"obs_{reader}_{region}"]
-            job = tasker.post_recognition(node["recognition"], build_param(node), image)
-            job.wait()
-            assert job.succeeded, f"{stem}/{region} 识别任务执行失败"
-            recognition = tasker.get_node_detail(job.get().node_id_list[0]).recognition
-            dump[region] = to_boxes(recognition.filtered_results)
+            dump[region] = run_region(tasker, image, nodes[f"obs_{reader}_{region}"], region)
         check_shape(dump, regions)
         return reader, dump
 
@@ -462,10 +459,10 @@ class TestEnhanceEndToEnd:
             assert result.extras["fodder_tier"] == FODDER_TIER_TEXT
             assert re.fullmatch(MORA_PATTERN, result.extras["mora"])
             assert result.extras["fingerprint"] == {"slot": slot, "name": name}
-        misread = ENHANCE_MISREAD_WARNINGS.get(stem, 0)
-        if misread:
-            assert len(result.warnings) == misread
-            assert all("误读" in w for w in result.warnings)
+        cross = ENHANCE_CROSS_WARNINGS.get(stem, 0)
+        if cross:
+            assert len(result.warnings) == cross
+            assert all("单通道" in w for w in result.warnings)
         else:
             assert result.warnings == []
         assert min(result.confidences.values()) >= 0.6

@@ -105,7 +105,7 @@
   Verify:   python -m pytest test/test_observe_enhance.py test/test_observe_list.py test/test_observe_parse.py -q  →  全绿
   Done:     E4 形态（四条 ①）、E6 形态（① + ③）、E7 形态（新词条 0 次）、待激活预览值入模，各有断言。
 
-- [ ] 3.2 双通道交叉与流水线节点
+- [x] 3.2 双通道交叉与流水线节点
   Goal:     强化次数有两个独立识别通道，交叉核对后入模；转储扩展到新通道。
   Read:     assets/resource/pipeline/genshin/observation.json（15 节点参数结构）
             tools/record_ocr_dumps.py:38-68 （区域清单与 build_param）

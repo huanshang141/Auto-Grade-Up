@@ -209,6 +209,31 @@
       ]
     ]
   },
+  "obs_enhance_roll_marks": {
+    "recognition": "TemplateMatch",
+    "template": [
+      "genshin/roll_mark/roll_mark_1.png",
+      "genshin/roll_mark/roll_mark_3.png"
+    ],
+    "roi": [
+      770,
+      195,
+      50,
+      150
+    ],
+    "threshold": 0.9
+  },
+  "obs_enhance_roll_marks_ocr": {
+    "recognition": "OCR",
+    "only_rec": false,
+    "roi": [
+      770,
+      195,
+      50,
+      150
+    ],
+    "threshold": 0.3
+  },
   "obs_enhance_mora": {
     "recognition": "OCR",
     "only_rec": true,

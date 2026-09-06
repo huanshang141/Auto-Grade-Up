@@ -224,7 +224,8 @@ class TestReadEnhanceRowRules:
         ]
 
     def test_marker_only_box_merges_into_row(self):
-        """标记独占文字框与词条行聚为一行时，为该行提供次数读数（E4 实测形态）。"""
+        """标记独占文字框与词条行聚为一行时，为该行提供次数读数（E4 实测形态）；
+        构造样例无模板通道，按单通道降级记警告（D6）。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
@@ -238,7 +239,8 @@ class TestReadEnhanceRowRules:
         assert len(result.artifact.substats) == 4
         assert result.artifact.substats[0].roll_count == 1
         assert result.artifact.substats[1].roll_count == 0
-        assert result.warnings == []
+        assert len(result.warnings) == 1
+        assert "单通道" in result.warnings[0]
 
 
 class TestReadEnhanceSettlementAndNewStat:
@@ -427,3 +429,113 @@ class TestReadEnhanceFailures:
         assert result.ok is True
         assert result.artifact.substats[0] == StatValue(name="歪词条", value=23.0, roll_count=0)
         assert any("歪词条" in w for w in result.warnings)
+
+
+class TestRollMarksCrossChannel:
+    """双通道交叉三态（D6/ADR-0007）：一致采纳、单侧降级 + 警告、不一致读取
+    失败、双侧无值记 0。模板通道命中框 text 为模板文件名（录制脚本标注）。"""
+
+    TMPL_1 = "genshin/roll_mark/roll_mark_1.png"
+    TMPL_3 = "genshin/roll_mark/roll_mark_3.png"
+
+    def base_recognition(self):
+        """四行副词条（5 星 +19 合法形态），无任何次数标记。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+            make_box("元素精通 23", box=[800, 281, 200, 20]),
+            make_box("暴击伤害 12.4%", box=[800, 316, 200, 20]),
+        ]
+        return recognition
+
+    def test_channels_agree_adopts_silently(self):
+        """行内 ① + 放大通道 ① + 模板通道 roll_mark_1 全一致 → 1，无警告。"""
+        recognition = self.base_recognition()
+        recognition["substats"][0] = make_box("①暴击率 5.8%", box=[800, 210, 200, 20])
+        recognition["roll_marks"] = [make_box(self.TMPL_1, 0.98, box=[776, 207, 22, 22])]
+        recognition["roll_marks_ocr"] = [make_box("①", 0.95, box=[776, 207, 22, 22])]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0] == StatValue(name="crit_rate", value=5.8, roll_count=1)
+        assert result.warnings == []
+
+    def test_template_only_takes_template_with_warning(self):
+        """仅模板通道有值（OCR 整体丢失形态）→ 取模板读数 + 单通道警告。"""
+        recognition = self.base_recognition()
+        recognition["roll_marks"] = [make_box(self.TMPL_1, 0.98, box=[776, 207, 22, 22])]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0].roll_count == 1
+        assert result.artifact.substats[1].roll_count == 0
+        assert len(result.warnings) == 1
+        assert "单通道" in result.warnings[0] and "模板" in result.warnings[0]
+
+    def test_inline_marker_only_takes_ocr_with_warning(self):
+        """仅 OCR 行内有 ②（fig2 实测形态，②模板未入库）→ 取 2 + 单通道警告。"""
+        recognition = self.base_recognition()
+        recognition["substats"][0] = make_box("②暴击率 5.8%", box=[800, 210, 200, 20])
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0].roll_count == 2
+        assert len(result.warnings) == 1
+        assert "单通道" in result.warnings[0] and "OCR" in result.warnings[0]
+
+    def test_conflict_fails_the_read(self):
+        """两通道都有值且不一致 → 读取失败（识别异常不静默判定）。"""
+        recognition = self.base_recognition()
+        recognition["substats"][0] = make_box("①暴击率 5.8%", box=[800, 210, 200, 20])
+        recognition["roll_marks"] = [make_box(self.TMPL_3, 0.9, box=[776, 207, 22, 22])]
+        recognition["roll_marks_ocr"] = [make_box("①", 0.95, box=[776, 207, 22, 22])]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is False
+        assert result.artifact is None
+        assert any("双通道不一致" in f and "crit_rate" not in f for f in result.failures)
+
+    def test_amplified_ocr_wins_over_inline_marker(self):
+        """放大通道与行内同框读数冲突时取放大通道（实验证实放大后更稳）。"""
+        recognition = self.base_recognition()
+        recognition["substats"][0] = make_box("③暴击率 5.8%", box=[800, 210, 200, 20])
+        recognition["roll_marks_ocr"] = [make_box("①", 0.95, box=[776, 207, 22, 22])]
+        recognition["roll_marks"] = [make_box(self.TMPL_1, 0.98, box=[776, 207, 22, 22])]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0].roll_count == 1
+        assert result.warnings == []
+
+    def test_misread_row_rescued_by_template(self):
+        """行首短数字误读（E6 形态）+ 模板通道命中 → 取模板读数 + 警告。"""
+        recognition = self.base_recognition()
+        recognition["substats"][0:1] = [
+            make_box("0", box=[780, 210, 16, 18]),
+            make_box("暴击率", box=[800, 210, 60, 20]),
+            make_box("3.5%", box=[900, 210, 50, 20]),
+            make_box("6.6%", box=[1210, 210, 50, 20]),
+        ]
+        recognition["roll_marks"] = [make_box(self.TMPL_1, 0.98, box=[776, 207, 22, 22])]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0] == StatValue(
+            name="crit_rate", value=6.6, roll_count=1
+        )
+        assert len(result.warnings) == 1
+        assert "误读" in result.warnings[0]
+
+    def test_both_channels_absent_means_zero(self):
+        """两侧都无值 → 0，无警告；roll_marks 区域键整体缺失同样不拦截。"""
+        recognition = self.base_recognition()
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert [s.roll_count for s in result.artifact.substats] == [0, 0, 0, 0]
+        assert result.warnings == []
+
+    def test_cross_template_hits_take_best_score(self):
+        """同一行多模板命中（①③ 图形相近产生交叉命中）取得分最高者。"""
+        recognition = self.base_recognition()
+        recognition["roll_marks"] = [
+            make_box(self.TMPL_1, 0.98, box=[776, 207, 22, 22]),
+            make_box(self.TMPL_3, 0.81, box=[776, 207, 22, 22]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[0].roll_count == 1

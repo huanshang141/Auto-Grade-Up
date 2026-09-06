@@ -18,7 +18,6 @@ from __future__ import annotations
 import re
 
 from dataclasses import dataclass
-
 from agent.rule_lambda.model import (
     Artifact,
     StatValue,
@@ -39,6 +38,9 @@ _ROLL_MARKER_COUNTS = {ch: i + 1 for i, ch in enumerate("①②③④⑤")}
 
 # 待激活标记的书写形态（全角/半角括号、OCR 丢括号），解析时替换为空格保留切分位
 _PENDING_MARKS = ("（待激活）", "(待激活)", "待激活")
+
+# 模板通道命中框的 text 为模板文件名（录制脚本标注），编号即次数（①~⑤ → 1~5）
+_ROLL_MARK_TEMPLATE = re.compile(r"roll_mark_([1-9])")
 
 # 各读取器的必要区域（缺失或全空 → 读取失败）；stars/lock 为模板匹配区域
 _LIST_REQUIRED_REGIONS = ("name", "slot", "main", "level", "substats", "set", "stars")
@@ -157,7 +159,7 @@ def read_list(recognition: dict, profile: GameProfile, textmap: Textmap) -> Read
     slot = _read_slot(recognition, textmap, failures, confidences)
     level = _read_level(recognition, failures, confidences)
     main = _read_main(recognition, textmap, failures, warnings, confidences)
-    substats, row_count = _read_substats(
+    substats, row_count, _rows, _row_stats = _read_substats(
         recognition, profile, textmap, failures, warnings, confidences, enhance=False
     )
     set_name = _read_set(recognition, confidences)
@@ -206,8 +208,9 @@ def read_enhance(
     面包屑按「/」切分为部位与圣遗物名（部位参与组装，两者入 extras.fingerprint）；
     等级、主词条、副词条现场读取；rarity/set/locked 取自 CarriedFields。
     exp/mora/fodder_tier 为附属读数（只进报告），原样入 extras，缺失不拦截。
-    待激活行入模（pending=True）；带圈数字映射词条 roll_count，无标记即 0；
-    行首孤立短数字（标记误读形态）剥离后次数记 None（未知）+ 警告（D7）。
+    待激活行入模（pending=True）；强化次数由双通道交叉定数（D6/ADR-0007）：
+    OCR 通道（放大区域 + 行内同框带圈字符）与模板通道（roll_marks）一致即
+    采纳、单侧有值取该侧 + 警告、不一致读取失败、双侧无值即 0。
     无状态：同输入两次调用结果相同。
     """
     failures: list[str] = []
@@ -239,9 +242,12 @@ def read_enhance(
 
     level = _read_level(recognition, failures, confidences)
     main = _read_main(recognition, textmap, failures, warnings, confidences)
-    substats, row_count = _read_substats(
+    substats, row_count, rows, row_stats = _read_substats(
         recognition, profile, textmap, failures, warnings, confidences, enhance=True
     )
+    cross_warnings, cross_failures = _resolve_roll_counts(rows, recognition, row_stats)
+    warnings.extend(cross_warnings)
+    failures.extend(cross_failures)
 
     extras: dict = {}
     for key in ("exp", "mora", "fodder_tier"):
@@ -373,17 +379,21 @@ def _read_main(recognition, textmap, failures, warnings, confidences) -> StatVal
 
 
 def _read_substats(recognition, profile, textmap, failures, warnings, confidences, enhance: bool):
-    """解析副词条各行；返回 (StatValue 列表, 已解锁行数)。
+    """解析副词条各行；返回 (StatValue 列表, 已解锁行数, 清洗行清单, 逐行词条对照表)。
+
+    逐行词条对照表（row_stats）与清洗行清单（rows）同长同序：行解析失败处
+    为 None（该行已记入 failures），保证强化次数交叉按行对齐不受解析失败影响。
+    
 
     enhance 表示强化页读取器：行清洗层追加「新」角标剥离与成长结算行合并
-    （列表页不存在这两种形态，异常双数值行走解析失败，见契约）；带圈数字
-    ①~⑤ 映射词条强化次数、无标记即 0，行首孤立短数字（误读形态）记
-    None（未知）+ 警告；列表页 roll_count 恒 None。行数校验、代号查重与
-    一致性警告只计已解锁行（待激活行不计，M2.5 起）。
+    （列表页不存在这两种形态，异常双数值行走解析失败，见契约）。roll_count
+    先按 OCR 行内通道赋初值（带圈字符映射 1~5、误读 None、无标记 0；列表页
+    恒 None），强化页随后由 _resolve_roll_counts 双通道交叉改写。行数校验、
+    代号查重与一致性警告只计已解锁行（待激活行不计，M2.5 起）。
     """
     raw_boxes = [b for b in recognition.get("substats") or [] if strip_spaces(b.get("text", ""))]
     if not raw_boxes:
-        return [], 0
+        return [], 0, [], []
     confidences["substats"] = min(box["score"] for box in raw_boxes)
 
     rows = _clean_substat_rows(_group_rows(raw_boxes), enhance)
@@ -393,9 +403,11 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
             f"副词条行数超出档案上限：{len(unlocked_rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
         )
 
-    substats = []
+    substats: list[StatValue] = []
+    row_stats: list[StatValue | None] = []
     for row in rows:
         stat = _parse_stat_row(row.text, textmap, failures, warnings, "副词条")
+        row_stats.append(stat)
         if stat is None:
             continue
         if row.pending:
@@ -405,9 +417,6 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
         elif enhance:
             if row.misread:
                 stat.roll_count = None
-                warnings.append(
-                    f"强化次数标记被误读为行首孤立数字，该词条次数记为未知：{row.text}"
-                )
             else:
                 stat.roll_count = row.marker_count or 0
         # 列表页不显示带圈数字：roll_count 保持 None（未知）
@@ -417,7 +426,96 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
     for code in sorted({c for c in codes if codes.count(c) > 1}):
         failures.append(f"副词条代号重复：{code}")
 
-    return substats, len(unlocked_rows)
+    return substats, len(unlocked_rows), rows, row_stats
+
+
+def _resolve_roll_counts(rows, recognition: dict, row_stats) -> tuple[list[str], list[str]]:
+    """强化次数双通道交叉（D6/ADR-0007）：按行对齐后三态定数，返回 (警告, 失败)。
+
+    OCR 通道取值优先级：放大通道（roll_marks_ocr 的带圈框，实验证实最稳）
+    → 行内同框带圈字符；行首短数字误读形态记「读取尝试但不可读」。
+    模板通道取该行命中框得分最高者的模板编号。三态：两通道都有值且不一致
+    → 读取失败；恰好一侧有值 → 取该侧 + 警告（单通道降级）；两侧都无 → 0
+    （roll_marks 区域缺失不拦截，与 mora 同级非必要区域）。
+    待激活行不入交叉（次数恒 None）；解析失败行不交叉（读取必然失败）。
+    直接改写 row_stats[i].roll_count。
+    """
+    warnings: list[str] = []
+    failures: list[str] = []
+    template_aligned = _align_to_rows(recognition.get("roll_marks") or [], rows)
+    amplified_aligned = _align_to_rows(recognition.get("roll_marks_ocr") or [], rows)
+    for index, row in enumerate(rows):
+        if row.pending:
+            continue
+        stat = row_stats[index]
+        if stat is None:
+            continue  # 该行解析失败已记 failures，读取必然失败、无需交叉
+        ocr_value = _ocr_channel_value(amplified_aligned.get(index), row)
+        template_value = _template_channel_value(template_aligned.get(index))
+        if ocr_value is not None and template_value is not None:
+            if ocr_value == template_value:
+                stat.roll_count = ocr_value
+            else:
+                failures.append(
+                    f"强化次数双通道不一致（OCR 读 {ocr_value}、模板读 {template_value}）：{row.text}"
+                )
+        elif ocr_value is not None:
+            stat.roll_count = ocr_value
+            warnings.append(
+                f"强化次数单通道读数（OCR 读 {ocr_value}、模板通道无值）：{row.text}"
+            )
+        elif template_value is not None:
+            stat.roll_count = template_value
+            if row.misread:
+                warnings.append(
+                    f"强化次数标记被误读为行首孤立数字，取模板通道读数 {template_value}：{row.text}"
+                )
+            else:
+                warnings.append(
+                    f"强化次数单通道读数（模板读 {template_value}、OCR 通道无值）：{row.text}"
+                )
+        elif row.misread:
+            # 误读且无模板通道交叉印证 → 记未知（缺失语义：数值比较不通过，D7）
+            stat.roll_count = None
+            warnings.append(
+                f"强化次数标记被误读为行首孤立数字，该词条次数记为未知：{row.text}"
+            )
+        else:
+            stat.roll_count = 0
+    return warnings, failures
+
+
+def _align_to_rows(boxes, rows) -> dict[int, list[dict]]:
+    """标记列框按纵向位置对齐到副词条行：框中心与行中心偏差 ≤ 行距容差。"""
+    aligned: dict[int, list[dict]] = {}
+    for box in boxes:
+        center = box["box"][1] + box["box"][3] / 2
+        for index, row in enumerate(rows):
+            if abs(center - row.center) <= _ROW_CENTER_TOLERANCE:
+                aligned.setdefault(index, []).append(box)
+                break
+    return aligned
+
+
+def _ocr_channel_value(amplified_boxes, row) -> int | None:
+    """OCR 通道该行读数：放大通道带圈框按得分取最高，退化到行内同框带圈字符。"""
+    for box in sorted(amplified_boxes or [], key=lambda b: -b["score"]):
+        marker = next((ch for ch in box.get("text", "") if ch in _ROLL_MARKER_COUNTS), None)
+        if marker is not None:
+            return _ROLL_MARKER_COUNTS[marker]
+    return row.marker_count
+
+
+def _template_channel_value(boxes) -> int | None:
+    """模板通道该行读数：命中框按得分取最高，模板文件名编号即次数（①~⑤ → 1~5）。"""
+    best: tuple[int, float] | None = None
+    for box in boxes or []:
+        matched = _ROLL_MARK_TEMPLATE.search(box.get("text", ""))
+        if matched is None:
+            continue
+        if best is None or box["score"] > best[1]:
+            best = (int(matched.group(1)), box["score"])
+    return best[0] if best else None
 
 
 def _clean_substat_rows(row_groups, enhance: bool) -> list[_SubstatRow]:
