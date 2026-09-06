@@ -1,17 +1,19 @@
 """M2 任务 4.3：识别结果转储录制——真实框架识别产出解析核心的输入夹具。
 
-对 test/fixtures/screenshots/ 的 18 张夹具逐节点 post_recognition（OCR 与
+对 test/fixtures/screenshots/ 的 27 张夹具逐节点 post_recognition（OCR 与
 TemplateMatch 参数取 assets/resource/pipeline/genshin/observation.json），
 节点名映射区域键后写 test/fixtures/ocr_dumps/<夹具主干>.json，形状为
 {"区域键": [{"box": [x, y, w, h], "text": str, "score": float}, ...]}。
 转储取识别详情的 filtered_results——流水线 replace 纠错只作用于该结果集
 （all 为原始识别，2026-08-29 对 MaaFw 5.12.3 实测），与运行时消费一致。
+2026-08-29 补强：带圈数字（强化次数标记）不再在识别层删除，保留进转储
+（解析核心剥离层不动，M2.5 的强化次数读取以此为输入）。
 
 绑定说明：maa 开发依赖的 wheel 未附带调试控制器库（MaaDbgControlUnit 缺失），
 离线识别只需要资源，直接以 MaaTaskerBindResource 绑定 Resource，不绑控制器。
 
-读取器归属（按界面）：fig1/fig3/fig6/fig7 与 L1…L8 为列表页；fig2/fig4/fig5
-与 E1…E3 为强化页。fig6/fig7 为排序设置截图，同样跑列表页节点、如实记录。
+读取器归属（按界面）：fig1/fig3/fig6/fig7 与 L1…L13 为列表页；fig2/fig4/fig5
+与 E1…E7 为强化页。fig6/fig7 为排序设置截图，同样跑列表页节点、如实记录。
 """
 
 from __future__ import annotations
@@ -102,7 +104,7 @@ def main() -> None:
     assert Library.framework().MaaTaskerBindResource(tasker._handle, resource._handle), "Resource 绑定失败"
 
     stems = sorted(path.stem for path in SCREENSHOT_DIR.glob("*.png"))
-    assert len(stems) == 18, f"预期 18 张夹具，实际 {len(stems)}"
+    assert len(stems) == 27, f"预期 27 张夹具，实际 {len(stems)}"
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     anomalies: list[str] = []
@@ -139,7 +141,7 @@ def main() -> None:
 
     print(f"已生成 {len(stems)} 份转储 → {OUT_DIR.relative_to(REPO_ROOT)}")
     if anomalies:
-        print(f"识别质量异常（{len(anomalies)} 条，如实记录，待 5.1 调优）：")
+        print(f"识别质量异常（{len(anomalies)} 条，如实记录）：")
         for line in anomalies:
             print("  -", line)
     else:

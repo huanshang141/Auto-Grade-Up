@@ -201,15 +201,16 @@ def read_enhance(
     if crumb_boxes:
         confidences["breadcrumb"] = min(box["score"] for box in crumb_boxes)
         crumb = strip_spaces(_join_text(crumb_boxes))
-        if "/" in crumb:
-            slot_text, _, name_text = crumb.partition("/")
+        parts = _split_breadcrumb(crumb, textmap)
+        if parts is None:
+            failures.append(f"面包屑不含「/」，无法切分部位与圣遗物名：{crumb}")
+        else:
+            slot_text, name_text = parts
             slot = textmap.slots.get(slot_text)
             if slot is None:
                 failures.append(f"部位名未收录对照文档：{slot_text}")
             else:
                 fingerprint = {"slot": slot, "name": name_text}
-        else:
-            failures.append(f"面包屑不含「/」，无法切分部位与圣遗物名：{crumb}")
 
     level = _read_level(recognition, failures, confidences)
     main = _read_main(recognition, textmap, failures, warnings, confidences)
@@ -258,6 +259,22 @@ def _region_empty(boxes, template: bool) -> bool:
     if template:
         return False
     return not any(strip_spaces(box.get("text", "")) for box in boxes)
+
+
+def _split_breadcrumb(crumb: str, textmap: Textmap) -> tuple[str, str] | None:
+    """面包屑切分：(部位名文本, 圣遗物名文本)；无法切分返回 None。
+
+    分隔符「/」可辨时按其切分；OCR 把分隔符读丢时（实测形态「生之花
+    教官的胸花」）按对照文档的部位名做前缀匹配——部位名收自对照文档，
+    匹配不到返回 None（安全方向：读取失败）。
+    """
+    if "/" in crumb:
+        slot_text, _, name_text = crumb.partition("/")
+        return slot_text.strip(), name_text.strip()
+    matched = next((s for s in textmap.slots if crumb.startswith(s)), None)
+    if matched is None:
+        return None
+    return matched, crumb[len(matched):].strip()
 
 
 def _record_confidence(confidences: dict, recognition: dict, key: str) -> None:
@@ -371,6 +388,7 @@ def _clean_substat_rows(row_groups, enhance: bool) -> list[str]:
         text = "".join(ch for ch in text if ch not in _ROLL_MARKERS)
         if enhance:
             text = _strip_new_marker(text)
+            text = _strip_roll_misread(text)
             text = _merge_settlement_row(text)
         if not text.strip() or "待激活" in text:
             continue
@@ -382,6 +400,20 @@ def _strip_new_marker(text: str) -> str:
     """剥离行首「新」角标（新解锁词条的金色标记；词条名本身不含「新」字）。"""
     stripped = text.lstrip()
     return stripped[1:].lstrip() if stripped.startswith("新") else stripped
+
+
+def _strip_roll_misread(text: str) -> str:
+    """剥离行首的一至两位孤立数字——强化次数标记的误读形态。
+
+    带圈数字（①③）常被 OCR 误读为「0」「3」：或并入词条名框（行首数字），
+    或独立成框与词条行聚组（行首数字 token）。词条名十族均不含数字，行首
+    短数字不可能是词条内容；真值不受影响（数字开头的多字符片段如「3,967」
+    只出现在数值位置，且此处只剥行首 token）。
+    """
+    tokens = text.split()
+    if tokens and tokens[0].isdigit() and len(tokens[0]) <= 2:
+        return " ".join(tokens[1:])
+    return text
 
 
 def _merge_settlement_row(text: str) -> str:

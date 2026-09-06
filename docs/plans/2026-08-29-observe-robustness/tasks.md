@@ -63,7 +63,7 @@
 
 ## 3. 流水线调整与转储重录
 
-- [ ] 3.1 MAX 纠错与带圈数字保留，27 份转储重录
+- [x] 3.1 MAX 纠错与带圈数字保留，27 份转储重录
   Goal:     满级等级可解析；转储保留强化次数标记（M2.5 输入）；27 份转储入库
   Read:     assets/resource/pipeline/genshin/observation.json  (obs_enhance_level
             与 obs_enhance_substats 的 replace 现状)

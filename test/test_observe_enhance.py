@@ -257,6 +257,26 @@ class TestReadEnhanceSettlementAndNewStat:
         assert result.failures == []
         assert result.artifact.substats == [StatValue(name="atk_percent", value=4.7)]
 
+    def test_roll_marker_misread_as_leading_digit(self):
+        """带圈数字被误读为行首短数字（E6 实测形态：①→0、③→3）剥离后正常解析。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("0", box=[780, 210, 16, 18]),
+            make_box("暴击率", box=[800, 210, 60, 20]),
+            make_box("3.5%", box=[900, 210, 50, 20]),
+            make_box("6.6%", box=[1210, 210, 50, 20]),
+            make_box("3", box=[780, 245, 16, 18]),
+            make_box("生命值", box=[800, 245, 60, 20]),
+            make_box("18.1%", box=[1210, 245, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.failures == []
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=6.6),
+            StatValue(name="hp_percent", value=18.1),
+        ]
+
     def test_single_value_row_unchanged(self):
         """静止单值行不受结算清洗影响（回归保护）。"""
         recognition = make_enhance_recognition()
@@ -325,9 +345,19 @@ class TestReadEnhanceFailures:
         assert result.artifact is None
         assert any("部位" in f for f in result.failures)
 
-    def test_breadcrumb_without_separator_fails(self):
+    def test_breadcrumb_separator_lost_splits_by_slot_prefix(self):
+        """分隔符被 OCR 读丢（E5 实测形态）：按对照文档部位名前缀匹配切分。"""
         recognition = make_enhance_recognition()
-        recognition["breadcrumb"] = [make_box("时之沙 星落湖之心")]
+        recognition["breadcrumb"] = [make_box("生之花  止于荣礼的缎彩")]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.extras["fingerprint"] == {"slot": "flower", "name": "止于荣礼的缎彩"}
+        assert result.artifact.slot == "flower"
+
+    def test_breadcrumb_without_separator_fails(self):
+        """前缀匹配不到任何部位名仍读取失败（安全方向不变）。"""
+        recognition = make_enhance_recognition()
+        recognition["breadcrumb"] = [make_box("止于荣礼的缎彩 生之花")]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is False
         assert any("面包屑" in f for f in result.failures)
