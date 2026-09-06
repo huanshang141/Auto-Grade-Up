@@ -33,3 +33,15 @@
 - 备注:   主词条序列化保持 {name, value}（契约：主词条不带次数字段）；
   spec 示例形状测试随新契约同步更新
 - Now:    进入任务 2.1（规则文件格式修订）
+
+## 2026-09-06 · 任务 2.1 规则文件格式修订（roll_rule / 白名单 / 导出同步）
+- Tried:  顶层可选键 roll_rule（结构与 rule 同一套校验、字段限定 roll.*、节点路径
+  前缀 roll_rule.）；sub.*/roll.* 运算符白名单收紧为 {>, >=, exists}；candidates.rarity
+  元素查成长上限表缺失即拒绝；JSON Schema 导出同步（roll_rule 独立 $defs、
+  词条 op 枚举收紧、rarity 值域收敛为有表星级枚举）
+- Result: test_schema.py 新增 15 项、test_export.py 新增 5 项、test_acceptance.py
+  新增 4 项双端等价断言全绿；全量 408 项通过
+- 设计备注: rarity 的生成物侧值域由 min/max 改为「有表星级枚举」（如原神 [4, 5]），
+  使「无表星级拒绝」在通用校验器上同样成立，保住两端等价承诺（契约工作副本
+  「元素须有该星级的单次成长上限表数据」的直接体现）
+- Now:    进入任务 2.2（求值语义修正）

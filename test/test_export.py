@@ -101,8 +101,8 @@ class TestExportJsonSchema:
 
     def test_candidates_value_ranges_from_profile(self, genshin):
         rarity_items = export_json_schema(genshin)["properties"]["candidates"]["properties"]["rarity"]["items"]
-        assert rarity_items["minimum"] == 1
-        assert rarity_items["maximum"] == 5
+        # M2.5 起候选星级收敛为有单次强化成长上限表数据的星级（原神档案 4/5 星）
+        assert rarity_items["enum"] == [4, 5]
 
     def test_top_level_key_set_fixed(self, genshin):
         schema = export_json_schema(genshin)
@@ -110,6 +110,42 @@ class TestExportJsonSchema:
         assert set(schema["required"]) == {
             "version", "game", "name", "candidates", "rule", "fodder"
         }
+
+    def test_roll_rule_optional_branch(self, genshin):
+        """roll_rule 可选：缺省文档合法；携带合法次数树的文档同样合法。"""
+        schema = export_json_schema(genshin)
+        assert "roll_rule" in schema["properties"]
+        assert "roll_rule" not in schema["required"]
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"field": "roll.crit_rate", "op": ">=", "value": 2}]}
+        assert Draft202012Validator(schema).is_valid(rule) is True
+
+    def test_roll_rule_field_enum_restricted(self, genshin):
+        """roll_rule 内叶子字段限定 roll.*：其余命名空间双分支都拒绝。"""
+        schema = export_json_schema(genshin)
+        validator = Draft202012Validator(schema)
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"field": "sub.crit_rate", "op": ">=", "value": 2}]}
+        assert validator.is_valid(rule) is False
+        rule["roll_rule"] = {"all": [{"field": "level", "op": ">=", "value": 2}]}
+        assert validator.is_valid(rule) is False
+
+    def test_substat_op_enum_tightened(self, genshin):
+        """词条字段 op 枚举收紧为 {>, >=, exists}；== 在生成物侧同样拒绝。"""
+        schema = export_json_schema(genshin)
+        validator = Draft202012Validator(schema)
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": "==", "value": 15}]}
+        assert validator.is_valid(rule) is False
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": ">=", "value": 15}]}
+        assert validator.is_valid(rule) is True
+
+    def test_main_op_enum_unchanged(self, genshin):
+        """main.* 维持全量数值运算符（当前值口径，ADR-0006 的边界）。"""
+        schema = export_json_schema(genshin)
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "main.atk_percent", "op": "==", "value": 31.5}]}
+        assert Draft202012Validator(schema).is_valid(rule) is True
 
     def test_second_game_enums_differ(self, genshin, second):
         """second_game.json 的 stats 与 slots 至少各一处与原神不同，生成物枚举随之不同。"""

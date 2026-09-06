@@ -19,14 +19,25 @@ from agent.rule_lambda.profile import GameProfile
 # 运算符集合是格式的一部分，固化于代码；「包含」（contains）为预留位，v1 不接受
 NUMERIC_OPS: frozenset[str] = frozenset({">", "<", ">=", "<=", "==", "!="})
 STRING_OPS: frozenset[str] = frozenset({"==", "!="})
+# 词条命名空间（sub.*/roll.*）的运算符白名单收紧：词条数值条件的口径是乐观
+# 可达值（ADR-0006），等于/小于在可达值下语义失真，M2.5 起校验层拒绝
+SUBSTAT_OPS: frozenset[str] = frozenset({">", ">="})
 EXISTS: str = "exists"
+
+# 字段命名空间分类 → 可用运算符（词条命名空间用收紧集合）
+_OPS_BY_KIND: dict[str, frozenset[str]] = {
+    "string": STRING_OPS | {EXISTS},
+    "number": NUMERIC_OPS | {EXISTS},
+    "substat": SUBSTAT_OPS | {EXISTS},
+}
 
 # 恒存在的标量字段（命名空间表，见 rule-file-format 契约）
 _NUMERIC_SCALAR_FIELDS = frozenset({"level", "rarity", "substat_count", "remaining_rolls"})
 _STRING_FIELDS = frozenset({"slot", "set"})
-_NAMESPACES = ("main", "sub")
+_NAMESPACES = ("main", "sub", "roll")
 
 _TOP_LEVEL_KEYS = {"version", "game", "name", "candidates", "rule", "fodder"}
+_OPTIONAL_TOP_LEVEL_KEYS = {"roll_rule"}
 _CANDIDATES_KEYS = {"rarity", "slots", "max_level", "respect_lock"}
 _FODDER_KEYS = {"strategy", "respect_lock"}
 
@@ -64,7 +75,7 @@ def validate(rules: dict, profile: GameProfile) -> None:
 
     keys = set(rules)
     missing = _TOP_LEVEL_KEYS - keys
-    extra = keys - _TOP_LEVEL_KEYS
+    extra = keys - _TOP_LEVEL_KEYS - _OPTIONAL_TOP_LEVEL_KEYS
     if missing:
         raise RuleValidationError(f"规则文件缺少键：{sorted(missing)}")
     if extra:
@@ -89,6 +100,10 @@ def validate(rules: dict, profile: GameProfile) -> None:
     _validate_candidates(rules["candidates"], profile)
     _validate_fodder(rules["fodder"], profile)
     _validate_node(rules["rule"], "rule", profile)
+    # 次数规则树（roll_rule，可选）：结构校验与 rule 同一套，叶子字段仅接受
+    # roll.<代号> 命名空间（M2.5，两套系统边界见 design.md D5）
+    if "roll_rule" in rules:
+        _validate_node(rules["roll_rule"], "roll_rule", profile, field_prefix="roll.")
 
 
 def _validate_candidates(candidates, profile: GameProfile) -> None:
@@ -120,6 +135,13 @@ def _validate_candidates(candidates, profile: GameProfile) -> None:
             raise RuleValidationError(
                 f"candidates.rarity 的元素超出档案星级范围：{element}"
                 f"（档案 {profile.game} 范围 [{profile.rarity_min}, {profile.rarity_max}]）",
+                f"candidates.rarity[{i}]",
+            )
+        # M2.5 起，候选星级必须有单次强化成长上限表数据（强化剪枝推导的数值输入）
+        if int(element) not in profile.roll_growth_max:
+            raise RuleValidationError(
+                f"candidates.rarity 的元素无该星级的单次强化成长上限表数据：{element}"
+                f"（档案 {profile.game} 有表星级：{sorted(profile.roll_growth_max)}）",
                 f"candidates.rarity[{i}]",
             )
 
@@ -179,8 +201,11 @@ def _validate_fodder(fodder, profile: GameProfile) -> None:
         )
 
 
-def _validate_node(node, path: str, profile: GameProfile) -> None:
-    """递归校验条件树节点；path 为该节点的定位路径（如 rule.all[0].any[1]）。"""
+def _validate_node(node, path: str, profile: GameProfile, field_prefix: str | None = None) -> None:
+    """递归校验条件树节点；path 为该节点的定位路径（如 rule.all[0].any[1]）。
+
+    field_prefix 非 None 时（次数规则树 roll_rule），叶子字段仅接受该前缀命名空间。
+    """
     if not isinstance(node, dict):
         raise RuleValidationError(
             f"条件树节点必须是对象，实际为 {type(node).__name__}", path
@@ -198,12 +223,12 @@ def _validate_node(node, path: str, profile: GameProfile) -> None:
                 f"组节点 {kind} 的值必须是数组，实际为 {type(children).__name__}", path
             )
         for i, child in enumerate(children):
-            _validate_node(child, f"{path}.{kind}[{i}]", profile)
+            _validate_node(child, f"{path}.{kind}[{i}]", profile, field_prefix)
         return
-    _validate_leaf(node, path, profile)
+    _validate_leaf(node, path, profile, field_prefix)
 
 
-def _validate_leaf(node: dict, path: str, profile: GameProfile) -> None:
+def _validate_leaf(node: dict, path: str, profile: GameProfile, field_prefix: str | None = None) -> None:
     keys = set(node)
     unknown = keys - {"field", "op", "value"}
     if unknown:
@@ -214,15 +239,22 @@ def _validate_leaf(node: dict, path: str, profile: GameProfile) -> None:
     field = node["field"]
     if not isinstance(field, str):
         raise RuleValidationError(f"field 必须是字符串，实际为 {field!r}", path)
+    if field_prefix is not None and not field.startswith(field_prefix):
+        raise RuleValidationError(
+            f"次数规则树（roll_rule）内的叶子字段仅接受 {field_prefix}<代号> 命名空间，"
+            f"实际为 {field!r}",
+            path,
+        )
     kind = _field_kind(field, profile, path)
 
     op = node["op"]
     if not isinstance(op, str):
         raise RuleValidationError(f"op 必须是字符串，实际为 {op!r}", path)
-    allowed = (STRING_OPS if kind == "string" else NUMERIC_OPS) | {EXISTS}
+    allowed = _OPS_BY_KIND[kind]
     if op not in allowed:
+        kind_label = {"string": "字符串", "number": "数值", "substat": "词条"}[kind]
         raise RuleValidationError(
-            f"{kind} 字段 {field} 不接受运算符 {op!r}（可接受：{sorted(allowed)}）", path
+            f"{kind_label}字段 {field} 不接受运算符 {op!r}（可接受：{sorted(allowed)}）", path
         )
 
     if op == EXISTS:
@@ -246,9 +278,10 @@ def _validate_leaf(node: dict, path: str, profile: GameProfile) -> None:
 
 
 def _field_kind(field: str, profile: GameProfile, path: str) -> str:
-    """字段名 → 值类型（"number" / "string"）；未知字段名抛 RuleValidationError。
+    """字段名 → 值类型（"number" / "string" / "substat"）；未知字段名抛 RuleValidationError。
 
-    命名空间表：标量字段恒存在；main.<代号>/sub.<代号> 的代号取自游戏档案。
+    命名空间表：标量字段恒存在；main.<代号>/sub.<代号>/roll.<代号> 的代号取自
+    游戏档案。词条命名空间（sub/roll）返回 "substat"，参与运算符白名单收紧。
     """
     if field in _STRING_FIELDS:
         return "string"
@@ -259,7 +292,7 @@ def _field_kind(field: str, profile: GameProfile, path: str) -> str:
         if field.startswith(prefix):
             code = field[len(prefix):]
             if code in profile.stats:
-                return "number"
+                return "number" if namespace == "main" else "substat"
             raise RuleValidationError(
                 f"字段 {field!r} 的属性代号不在档案 {profile.game} 的清单内", path
             )
@@ -269,27 +302,31 @@ def _field_kind(field: str, profile: GameProfile, path: str) -> str:
 def export_json_schema(profile: GameProfile) -> dict:
     """按游戏档案导出规则文件的 JSON Schema（Draft 2020-12），供 M5 编辑器消费。
 
-    与手写 validate() 同源：结构（顶层键集合固定）、game 比对、档案代号枚举与
-    candidates 的 slots/rarity 值域、fodder.strategy 枚举（与档案回合机制同源）、
-    运算符与字段类型兼容（if/then）、exists 无 value 的形状、值类型随字段。
+    与手写 validate() 同源：结构（必填顶层键集合固定、roll_rule 可选）、game 比对、
+    档案代号枚举与 candidates 的 slots/rarity 值域（rarity 收敛到有成长上限表的
+    星级）、fodder.strategy 枚举（与档案回合机制同源）、运算符与字段类型兼容
+    （if/then，词条命名空间 op 枚举收紧）、exists 无 value 的形状、值类型随字段。
+    次数规则树（roll_rule）单独一组 $defs：叶子字段枚举限定为 roll.<代号>。
     所有枚举排序输出，同一档案两次导出结果一致；两端等价性由同一批样本双端
     断言兜底（任务 6.1）。生成物不手工编辑：修改格式或档案后重新导出。
     """
-    string_ops = sorted(STRING_OPS | {EXISTS})
-    numeric_ops = sorted(NUMERIC_OPS | {EXISTS})
+    string_ops = sorted(_OPS_BY_KIND["string"])
+    numeric_ops = sorted(_OPS_BY_KIND["number"])
+    substat_ops = sorted(_OPS_BY_KIND["substat"])
     string_fields = sorted(_STRING_FIELDS)
     scalar_fields = sorted(_NUMERIC_SCALAR_FIELDS)
     main_fields = sorted(f"main.{code}" for code in profile.stats)
     sub_fields = sorted(f"sub.{code}" for code in profile.stats)
+    roll_fields = sorted(f"roll.{code}" for code in profile.stats)
 
-    def leaf_branch(fields: list[str], value_schema: dict) -> dict:
+    def leaf_branch(fields: list[str], value_schema: dict, ops: list[str]) -> dict:
         # value 的类型声明必须在分支主体 properties 内（additionalProperties
         # 只认同层声明），exists 不带 value 由 if/then 的存在性约束负责
         return {
             "type": "object",
             "properties": {
                 "field": {"enum": fields},
-                "op": {"enum": string_ops if value_schema["type"] == "string" else numeric_ops},
+                "op": {"enum": ops},
                 "value": value_schema,
             },
             "required": ["field", "op"],
@@ -302,10 +339,10 @@ def export_json_schema(profile: GameProfile) -> dict:
     number_schema = {"type": "number"}
     string_schema = {"type": "string"}
 
-    def group_branch(key: str) -> dict:
+    def group_branch(key: str, node_ref: str) -> dict:
         return {
             "type": "object",
-            "properties": {key: {"type": "array", "items": {"$ref": "#/$defs/node"}}},
+            "properties": {key: {"type": "array", "items": {"$ref": f"#/$defs/{node_ref}"}}},
             "required": [key],
             "additionalProperties": False,
         }
@@ -321,12 +358,12 @@ def export_json_schema(profile: GameProfile) -> dict:
             "candidates": {
                 "type": "object",
                 "properties": {
+                    # M2.5 起候选星级须有单次强化成长上限表数据，值域收敛为有表星级
                     "rarity": {
                         "type": "array",
                         "items": {
                             "type": "integer",
-                            "minimum": profile.rarity_min,
-                            "maximum": profile.rarity_max,
+                            "enum": sorted(profile.roll_growth_max),
                         },
                     },
                     "slots": {"type": "array", "items": {"enum": sorted(profile.slots)}},
@@ -338,6 +375,7 @@ def export_json_schema(profile: GameProfile) -> dict:
                 "additionalProperties": False,
             },
             "rule": {"$ref": "#/$defs/node"},
+            "roll_rule": {"$ref": "#/$defs/roll_node"},
             "fodder": {
                 "type": "object",
                 "properties": {
@@ -358,15 +396,25 @@ def export_json_schema(profile: GameProfile) -> dict:
                     {"$ref": "#/$defs/leaf"},
                 ]
             },
-            "group_all": group_branch("all"),
-            "group_any": group_branch("any"),
+            "group_all": group_branch("all", "node"),
+            "group_any": group_branch("any", "node"),
             "leaf": {
                 "oneOf": [
-                    leaf_branch(string_fields, string_schema),
-                    leaf_branch(scalar_fields, number_schema),
-                    leaf_branch(main_fields, number_schema),
-                    leaf_branch(sub_fields, number_schema),
+                    leaf_branch(string_fields, string_schema, string_ops),
+                    leaf_branch(scalar_fields, number_schema, numeric_ops),
+                    leaf_branch(main_fields, number_schema, numeric_ops),
+                    leaf_branch(sub_fields, number_schema, substat_ops),
                 ]
             },
+            "roll_node": {
+                "oneOf": [
+                    {"$ref": "#/$defs/roll_group_all"},
+                    {"$ref": "#/$defs/roll_group_any"},
+                    {"$ref": "#/$defs/roll_leaf"},
+                ]
+            },
+            "roll_group_all": group_branch("all", "roll_node"),
+            "roll_group_any": group_branch("any", "roll_node"),
+            "roll_leaf": leaf_branch(roll_fields, number_schema, substat_ops),
         },
     }

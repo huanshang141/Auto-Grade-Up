@@ -39,7 +39,7 @@
 
 ## 2. 决策机构
 
-- [ ] 2.1 规则文件格式修订（roll_rule / 白名单 / 导出同步）
+- [x] 2.1 规则文件格式修订（roll_rule / 白名单 / 导出同步）
   Goal:     规则文件支持可选次数规则树；词条字段运算符收紧；Schema 生成物同步。
   Read:     agent/rule_lambda/schema.py:20-31   （命名空间常量与运算符集合）
             agent/rule_lambda/schema.py:60-92   （validate 顶层键校验）

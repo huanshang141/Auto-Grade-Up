@@ -65,6 +65,47 @@ class TestLegalRules:
     def test_spec_example(self, genshin):
         assert validate(make_rule(), genshin) is None
 
+    def test_roll_rule_optional_and_legal(self, genshin):
+        """roll_rule 可选：携带合法次数树（roll.* 字段、白名单运算符）通过。"""
+        rule = make_rule()
+        rule["roll_rule"] = {
+            "all": [
+                {"field": "roll.crit_rate", "op": ">=", "value": 2},
+                {"any": [{"field": "roll.crit_dmg", "op": "exists"}]},
+            ]
+        }
+        assert validate(rule, genshin) is None
+
+    def test_roll_rule_empty_group_legal(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": []}
+        assert validate(rule, genshin) is None
+
+    def test_roll_rule_wrong_namespace_rejected(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"field": "sub.crit_rate", "op": ">=", "value": 2}]}
+        expect_error(rule, "roll_rule.all[0]", genshin)
+
+    def test_roll_rule_scalar_field_rejected(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"field": "level", "op": ">=", "value": 2}]}
+        expect_error(rule, "roll_rule.all[0]", genshin)
+
+    def test_roll_rule_nested_path_format(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"any": [{"field": "main.atk", "op": "exists"}]}]}
+        expect_error(rule, "roll_rule.all[0].any[0]", genshin)
+
+    def test_roll_rule_unknown_stat_code(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": [{"field": "roll.foo", "op": ">=", "value": 2}]}
+        expect_error(rule, "roll_rule.all[0]", genshin)
+
+    def test_roll_rule_group_not_list(self, genshin):
+        rule = make_rule()
+        rule["roll_rule"] = {"all": 5}
+        expect_error(rule, "roll_rule", genshin)
+
     def test_empty_candidates_arrays_mean_unrestricted(self, genshin):
         rule = make_rule()
         rule["candidates"]["rarity"] = []
@@ -210,6 +251,17 @@ class TestCandidates:
         rule = make_rule()
         del rule["candidates"]["respect_lock"]
         expect_error(rule, "candidates", genshin)
+
+    def test_rarity_without_growth_table_rejected(self, genshin):
+        """M2.5 起，候选星级须有单次强化成长上限表数据（原神档案 4/5 星）。"""
+        rule = make_rule()
+        rule["candidates"]["rarity"] = [3]
+        expect_error(rule, "candidates.rarity[0]", genshin)
+
+    def test_rarity_with_table_passes(self, genshin):
+        rule = make_rule()
+        rule["candidates"]["rarity"] = [4, 5]
+        assert validate(rule, genshin) is None
 
     def test_extra_key(self, genshin):
         rule = make_rule()
@@ -409,3 +461,56 @@ class TestConditionTree:
             ]
         }
         expect_error(rule, "rule.all[1].any[1]", genshin)
+
+
+class TestSubstatOpWhitelist:
+    """词条命名空间（sub.*/roll.*）运算符白名单收紧为 {>, >=, exists}（M2.5，ADR-0006）；
+    main.* 与标量字段维持全量数值运算符。"""
+
+    def test_sub_rejects_equal(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": "==", "value": 15}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    def test_sub_rejects_not_equal(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": "!=", "value": 15}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    @pytest.mark.parametrize("op", ["<", "<="])
+    def test_sub_rejects_smaller(self, genshin, op):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": op, "value": 15}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    @pytest.mark.parametrize("op", [">", ">="])
+    def test_sub_accepts_growth_ops(self, genshin, op):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": op, "value": 15}]}
+        assert validate(rule, genshin) is None
+
+    def test_sub_accepts_exists(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "sub.crit_rate", "op": "exists"}]}
+        assert validate(rule, genshin) is None
+
+    @pytest.mark.parametrize("op", [">", ">="])
+    def test_roll_accepts_growth_ops(self, genshin, op):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "roll.crit_rate", "op": op, "value": 2}]}
+        assert validate(rule, genshin) is None
+
+    def test_roll_rejects_equal(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "roll.crit_rate", "op": "==", "value": 2}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    def test_roll_rejects_non_numeric_value(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "roll.crit_rate", "op": ">=", "value": "2"}]}
+        expect_error(rule, "rule.all[0]", genshin)
+
+    def test_main_keeps_full_numeric_ops(self, genshin):
+        rule = make_rule()
+        rule["rule"] = {"all": [{"field": "main.atk_percent", "op": "==", "value": 31.5}]}
+        assert validate(rule, genshin) is None

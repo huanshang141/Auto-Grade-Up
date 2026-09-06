@@ -115,6 +115,38 @@ class TestLegalSamples:
         assert validate(copy.deepcopy(rule), genshin) is None
         assert validator.is_valid(rule) is True
 
+    def test_roll_rule_legal_passes_both_ends(self, genshin, validator):
+        """M2.5：可选次数规则树（roll.* 字段）双端通过。"""
+        rule = base_rule({"all": [{"field": "level", "op": "<", "value": 20}]})
+        rule["roll_rule"] = {
+            "all": [{"field": "roll.crit_rate", "op": ">=", "value": 2}]
+        }
+        assert validate(copy.deepcopy(rule), genshin) is None
+        assert validator.is_valid(rule) is True
+
+    def test_substat_op_whitelist_rejected_both_ends(self, genshin, validator):
+        """词条字段用 == 双端一致拒绝（M2.5 白名单收紧）。"""
+        rule = base_rule({"all": [{"field": "sub.crit_rate", "op": "==", "value": 15}]})
+        with pytest.raises(RuleValidationError):
+            validate(copy.deepcopy(rule), genshin)
+        assert validator.is_valid(rule) is False
+
+    def test_roll_rule_foreign_field_rejected_both_ends(self, genshin, validator):
+        """roll_rule 内出现 roll.* 之外的字段双端一致拒绝。"""
+        rule = base_rule({"all": []})
+        rule["roll_rule"] = {"all": [{"field": "level", "op": ">=", "value": 2}]}
+        with pytest.raises(RuleValidationError):
+            validate(copy.deepcopy(rule), genshin)
+        assert validator.is_valid(rule) is False
+
+    def test_rarity_without_growth_table_rejected_both_ends(self, genshin, validator):
+        """候选星级无成长上限表数据双端一致拒绝（schema 侧由枚举收敛保证）。"""
+        rule = base_rule({"all": []})
+        rule["candidates"]["rarity"] = [3]
+        with pytest.raises(RuleValidationError):
+            validate(copy.deepcopy(rule), genshin)
+        assert validator.is_valid(rule) is False
+
 
 class TestIllegalSamples:
     @pytest.mark.parametrize(
