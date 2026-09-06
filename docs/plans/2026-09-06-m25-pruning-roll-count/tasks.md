@@ -59,7 +59,7 @@
   Verify:   python -m pytest test/test_schema.py test/test_export.py test/test_acceptance.py -q  →  全绿
   Done:     合法样例（含 roll_rule）双端通过；词条字段用 == / <= 的样例两端一致拒绝。
 
-- [ ] 2.2 求值语义修正（可达值 / roll 字段 / trace 形状）
+- [x] 2.2 求值语义修正（可达值 / roll 字段 / trace 形状）
   Goal:     词条数值条件按乐观可达值求值，剪枝生效且 trace 可解释。
   Read:     agent/rule_lambda/evaluate.py:20-46  （Judgment / evaluate / remaining_rolls）
             agent/rule_lambda/evaluate.py:84-114 （_field_value）

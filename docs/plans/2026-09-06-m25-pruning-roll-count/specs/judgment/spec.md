@@ -64,5 +64,9 @@
 
 - 词条命名空间（`sub.*`、`roll.*`）的叶子 trace 额外携带 `derivation`（当前值或当前次数、可分配成长次数、成长上限），保证剪枝决策可解释、可重放；其余叶子无该键
 - `roll_rule` 子树内叶子的 `derivation` 形状为 `{"current_rolls": <当前次数>, "budget": <可分配成长次数>}`
-- exists 叶子无 `value` 键；`actual` 为字段存在时的实际数值、缺失时为 `"missing"`
+- `derivation` 仅数值叶子且词条存在时携带（exists 叶子无该键；词条缺失时无可推导内容，同样无该键）
+- 数值叶子遇词条 `roll_count` 为 null（词条在、次数未知）时 `actual` 为 `"unknown"`：
+  数值比较不通过（识别异常不静默放行）、`exists` 为真；`derivation` 仍携带
+  （`current_rolls` 为 null、`budget` 为推导值）
+- exists 叶子无 `value` 键；`actual` 为字段存在时的当前实际数值、缺失时为 `"missing"`
 - 每个 `passed` 可由该节点与子节点的记录独立复核——报告里的每个决策可解释、可重放

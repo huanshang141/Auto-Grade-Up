@@ -32,7 +32,20 @@
   加载与新形状 JSON 往返均有断言；全量 379 项通过
 - 备注:   主词条序列化保持 {name, value}（契约：主词条不带次数字段）；
   spec 示例形状测试随新契约同步更新
-- Now:    进入任务 2.1（规则文件格式修订）
+- Now:    进入任务 2.2（求值语义修正）
+
+## 2026-09-06 · 任务 2.2 求值语义修正（可达值 / roll 字段 / trace 形状）
+- Tried:  evaluate 增纯函数推导（R/U/budget）、sub/roll 命名空间改乐观可达值口径、
+  第四参 roll_rule 与 trace 顶层双树形状；测试全量重写对齐
+- Result: test_evaluate.py 50 项全绿——discussion.md「可达性推导公式节」逐分支
+  有断言（增长达标、全部投入仍不足止损、必解锁挤占、待激活预览值起算、
+  满级零预算、变动点之间、缺失不可达、3 星查表 ProfileError、roll 可达、
+  null 次数缺失、roll_rule 合并与拦截）；全量 429 项通过
+- 实现定案（契约工作副本已同步）：trace 的 actual 增 "unknown" 哨兵——词条在而
+  roll_count 为 null 时数值比较不通过、exists 为真；derivation 仅数值叶子且词条
+  存在时携带（exists 叶子与缺失叶子无该键）；exists 判断不查成长上限表
+  （存在性与可达性分离，3 星圣遗物的 exists/roll 条件仍可求值）
+- Now:    进入任务 3.1（解析核心）
 
 ## 2026-09-06 · 任务 2.1 规则文件格式修订（roll_rule / 白名单 / 导出同步）
 - Tried:  顶层可选键 roll_rule（结构与 rule 同一套校验、字段限定 roll.*、节点路径
