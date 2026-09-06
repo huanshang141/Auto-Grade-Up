@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 
 from agent.rule_lambda.model import (
@@ -40,6 +42,10 @@ _TEMPLATE_REGIONS = frozenset({"stars", "lock"})
 
 # 行内文字框中心的纵向偏差上界（720 基准）：相邻词条行距约 25~36px
 _ROW_CENTER_TOLERANCE = 14
+
+# 数值样片段：数字开头、仅含数字与小数点/千位逗号/百分号；用于成长结算行
+# 按「数值个数」判断（契约：不依赖箭头符号的识别结果）
+_VALUE_TOKEN = re.compile(r"[0-9][0-9.,%]*")
 
 
 @dataclass
@@ -128,7 +134,9 @@ def read_list(recognition: dict, profile: GameProfile, textmap: Textmap) -> Read
     slot = _read_slot(recognition, textmap, failures, confidences)
     level = _read_level(recognition, failures, confidences)
     main = _read_main(recognition, textmap, failures, warnings, confidences)
-    substats, row_count = _read_substats(recognition, profile, textmap, failures, warnings, confidences)
+    substats, row_count = _read_substats(
+        recognition, profile, textmap, failures, warnings, confidences, enhance=False
+    )
     set_name = _read_set(recognition, confidences)
 
     stars = recognition.get("stars") or []
@@ -206,7 +214,7 @@ def read_enhance(
     level = _read_level(recognition, failures, confidences)
     main = _read_main(recognition, textmap, failures, warnings, confidences)
     substats, row_count = _read_substats(
-        recognition, profile, textmap, failures, warnings, confidences
+        recognition, profile, textmap, failures, warnings, confidences, enhance=True
     )
 
     extras: dict = {}
@@ -322,14 +330,18 @@ def _read_main(recognition, textmap, failures, warnings, confidences) -> StatVal
     return _parse_stat_row(_join_text(boxes), textmap, failures, warnings, "主词条")
 
 
-def _read_substats(recognition, profile, textmap, failures, warnings, confidences):
-    """解析副词条各行；返回 (StatValue 列表, 待激活丢弃后的行数)。"""
+def _read_substats(recognition, profile, textmap, failures, warnings, confidences, enhance: bool):
+    """解析副词条各行；返回 (StatValue 列表, 待激活丢弃后的行数)。
+
+    enhance 表示强化页读取器：行清洗层追加「新」角标剥离与成长结算行合并
+    （列表页不存在这两种形态，异常双数值行走解析失败，见契约）。
+    """
     raw_boxes = [b for b in recognition.get("substats") or [] if strip_spaces(b.get("text", ""))]
     if not raw_boxes:
         return [], 0
     confidences["substats"] = min(box["score"] for box in raw_boxes)
 
-    rows = _clean_substat_rows(_group_rows(raw_boxes))
+    rows = _clean_substat_rows(_group_rows(raw_boxes), enhance)
     if len(rows) > profile.substat_max:
         failures.append(
             f"副词条行数超出档案上限：{len(rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
@@ -348,16 +360,43 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
     return substats, len(rows)
 
 
-def _clean_substat_rows(row_groups) -> list[str]:
-    """行级清洗：行内框按横序拼接，去强化次数标记；「待激活」预览行与标记独占行整行丢弃。"""
+def _clean_substat_rows(row_groups, enhance: bool) -> list[str]:
+    """行级清洗：行内框按横序拼接，去强化次数标记；「待激活」预览行与标记
+    独占行整行丢弃。强化页另剥离「新」角标（新解锁词条）并把成长结算行
+    「名 旧值 新值」合并为「名 新值」——新值是当前值，判断依据是数值个数
+    （契约「强化页的读取时机与行形态」）。"""
     rows = []
     for group in row_groups:
         text = " ".join(box.get("text", "") for box in sorted(group, key=lambda b: b["box"][0]))
         text = "".join(ch for ch in text if ch not in _ROLL_MARKERS)
+        if enhance:
+            text = _strip_new_marker(text)
+            text = _merge_settlement_row(text)
         if not text.strip() or "待激活" in text:
             continue
         rows.append(text.strip())
     return rows
+
+
+def _strip_new_marker(text: str) -> str:
+    """剥离行首「新」角标（新解锁词条的金色标记；词条名本身不含「新」字）。"""
+    stripped = text.lstrip()
+    return stripped[1:].lstrip() if stripped.startswith("新") else stripped
+
+
+def _merge_settlement_row(text: str) -> str:
+    """成长结算行「名 旧值 新值」合并为「名 新值」。
+
+    行内出现两个及以上数值样片段时，词条名取首个数值之前的片段（箭头
+    符号及其误读杂字位于两数值之间，一并丢弃），数值取最后一个——强化
+    已完成，新值是当前值。数值个数不足两个（静止单值行）原样返回。
+    """
+    tokens = text.split()
+    value_indexes = [i for i, token in enumerate(tokens) if _VALUE_TOKEN.fullmatch(token)]
+    if len(value_indexes) < 2:
+        return text
+    head = tokens[: value_indexes[0]]
+    return " ".join([*head, tokens[value_indexes[-1]]])
 
 
 def _parse_stat_row(row_text, textmap, failures, warnings, label) -> StatValue | None:

@@ -326,3 +326,20 @@ class TestReadListFailures:
         assert result.ok is False
         assert result.artifact is None
         assert any("部位" in f for f in result.failures)
+
+
+class TestReadListRejectsSettlementRow:
+    """列表页不存在成长结算形态（契约：仅强化页出现）——OCR 异常导致的双
+    数值行按读取失败处理，不静默取值（2026-08-29 补强定案）。"""
+
+    def test_double_value_row_fails_in_list_reader(self):
+        recognition = make_list_recognition()
+        recognition["substats"] = [
+            make_box("防御力", box=[898, 320, 60, 20]),
+            make_box("5.8%", box=[960, 320, 50, 20]),
+            make_box("11.1%", box=[1010, 320, 50, 20]),
+        ]
+        result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is False
+        assert result.artifact is None
+        assert any("副词条" in f for f in result.failures)

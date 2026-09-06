@@ -201,6 +201,74 @@ class TestReadEnhanceRowRules:
         assert result.warnings == []
 
 
+class TestReadEnhanceSettlementAndNewStat:
+    """强化页三种新形态（2026-08-29 拷问定案，契约「强化页的读取时机与行形态」）：
+    成长结算行取新值、「新」角标剥离；判断依据是数值个数、不依赖箭头符号。"""
+
+    def test_settlement_row_takes_new_value(self):
+        """结算行「名 旧值 新值」取新值入模（强化已完成，新值是当前值）。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("防御力", box=[800, 210, 60, 20]),
+            make_box("5.8%", box=[900, 210, 50, 20]),
+            make_box("11.1%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.failures == []
+        assert result.artifact.substats == [StatValue(name="def_percent", value=11.1)]
+
+    def test_settlement_row_with_roll_marker_and_arrow_residue(self):
+        """带圈数字先剥离；箭头被 OCR 读出的杂字框丢弃，仍取最后一个数值。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("①暴击率", box=[800, 210, 70, 20]),
+            make_box("3.5%", box=[900, 210, 50, 20]),
+            make_box("→", box=[1050, 212, 30, 18]),
+            make_box("6.6%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [StatValue(name="crit_rate", value=6.6)]
+
+    def test_settlement_row_arrow_misread_as_junk(self):
+        """箭头被误读为杂字（如「t」）同样丢弃——判断只看数值个数。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("生命值", box=[800, 210, 60, 20]),
+            make_box("3.5%", box=[900, 210, 50, 20]),
+            make_box("t", box=[1050, 212, 20, 18]),
+            make_box("18.1%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [StatValue(name="hp_percent", value=18.1)]
+
+    def test_new_stat_marker_stripped(self):
+        """「新」角标（新解锁词条）剥离后按普通单值解析。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("新", box=[778, 210, 24, 20]),
+            make_box("攻击力", box=[810, 210, 60, 20]),
+            make_box("4.7%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.failures == []
+        assert result.artifact.substats == [StatValue(name="atk_percent", value=4.7)]
+
+    def test_single_value_row_unchanged(self):
+        """静止单值行不受结算清洗影响（回归保护）。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("暴击率", box=[800, 210, 60, 20]),
+            make_box("3.1%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [StatValue(name="crit_rate", value=3.1)]
+
+
 class TestReadEnhanceFailures:
     def test_missing_required_region(self):
         recognition = make_enhance_recognition()
