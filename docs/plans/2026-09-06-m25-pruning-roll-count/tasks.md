@@ -128,7 +128,7 @@
 
 ## 4. 收口
 
-- [ ] 4.1 端到端真值表扩展
+- [x] 4.1 端到端真值表扩展
   Goal:     27 张夹具的真值表覆盖 roll_count / pending；全量测试绿。
   Read:     test/test_observe_e2e.py:1-80（LIST_TRUTH / ENHANCE_TRUTH 结构与断言分支）
             test/fixtures/incoming/README.md（夹具验收记录与缺口清单）

@@ -1,10 +1,11 @@
 """任务 5.1：离线全链路测试——截图夹具 → 框架识别 → 解析核心 → 真值断言。
 
-第二层测试（concept.md §6）：对 18 张截图夹具跑与运行时完全相同的框架识别
+第二层测试（concept.md §6）：对 27 张截图夹具跑与运行时完全相同的框架识别
 （同引擎、同模型、同节点定义——节点参数取 observation.json），识别构造与
 录制脚本 tools/record_ocr_dumps.py 是同一份代码（直接复用其常量与函数）；
 识别结果集经解析核心两个读取器后逐字段断言。真值表 2026-08-29 逐一从截图
-抄录；星级、锁定以列表页模板匹配命中为准。
+抄录；词条强化次数与待激活标记按 M2.5 双通道交叉后的口径断言（2026-09-06）；
+星级、锁定以列表页模板匹配命中为准。
 
 maa 绑定仅经 requirements-dev 引入（解析核心不导入，冒烟测试守卫）。
 fig4/fig5 为弹窗遮挡形态（proposal 风险表预登记）：fig4 的素材档位下拉弹窗
@@ -424,6 +425,8 @@ class TestListEndToEnd:
         assert artifact.locked is locked
         assert artifact.main == StatValue(name=main[0], value=main[1])
         assert_stat_rows(artifact.substats, substats)
+        # 列表页不显示带圈数字：全部词条 roll_count 恒 None（未知）
+        assert all(s.roll_count is None for s in artifact.substats)
         assert result.extras == {}
         assert min(result.confidences.values()) >= 0.6
 
