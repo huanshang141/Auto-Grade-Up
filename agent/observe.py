@@ -32,8 +32,13 @@ from agent.textmap import Textmap
 # 固定值与百分比共用一条文字族代号的双代号族：按 % 后缀落 _percent 代号
 _DUAL_CODE_FAMILIES = frozenset({"hp", "atk", "def"})
 
-# 强化次数标记（契约：不参与解析）；OCR 可能把它并进行尾或单成一行
+# 强化次数标记字符全集（①~⑳，剥离用）；可出现的只有 ①~⑤（U+2460~2464），
+# 按字符映射强化次数 1~5（契约「字段组装规则」）
 _ROLL_MARKERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
+_ROLL_MARKER_COUNTS = {ch: i + 1 for i, ch in enumerate("①②③④⑤")}
+
+# 待激活标记的书写形态（全角/半角括号、OCR 丢括号），解析时替换为空格保留切分位
+_PENDING_MARKS = ("（待激活）", "(待激活)", "待激活")
 
 # 各读取器的必要区域（缺失或全空 → 读取失败）；stars/lock 为模板匹配区域
 _LIST_REQUIRED_REGIONS = ("name", "slot", "main", "level", "substats", "set", "stars")
@@ -67,6 +72,22 @@ class CarriedFields:
     rarity: int
     set: str
     locked: bool
+
+
+@dataclass
+class _SubstatRow:
+    """清洗后的一个副词条行：行文本与该行的次数通道读数（M2.5）。
+
+    marker_count：行内带圈字符读数（1~5，无标记为 None）；misread：行首孤立
+    短数字（带圈数字的 1 倍整图误读形态）；pending：待激活预览行；
+    center：行中心的纵坐标（720 基准，供模板通道按行对齐）。
+    """
+
+    text: str
+    center: float
+    marker_count: int | None
+    misread: bool
+    pending: bool
 
 
 def split_stat_text(text: str) -> tuple[str, str]:
@@ -118,8 +139,10 @@ def read_list(recognition: dict, profile: GameProfile, textmap: Textmap) -> Read
     """列表页读取器：右栏预览识别结果集 → 圣遗物属性。
 
     星级 = stars 区域命中数；锁定 = lock 区域有命中；其余字段取 OCR。
-    「待激活」预览行整行丢弃；硬失败与警告的分界见 observation 契约
-    「未知与缺失语义」。无状态：同输入两次调用结果相同，不修改输入。
+    待激活预览行入模（pending=True，预览值即解锁后初始值，ADR-0006）；
+    副词条 roll_count 恒 None（列表页不显示带圈数字——未知，与 0 是两种状态）。
+    硬失败与警告的分界见 observation 契约「未知与缺失语义」。
+    无状态：同输入两次调用结果相同，不修改输入。
     """
     failures: list[str] = []
     warnings: list[str] = []
@@ -183,7 +206,9 @@ def read_enhance(
     面包屑按「/」切分为部位与圣遗物名（部位参与组装，两者入 extras.fingerprint）；
     等级、主词条、副词条现场读取；rarity/set/locked 取自 CarriedFields。
     exp/mora/fodder_tier 为附属读数（只进报告），原样入 extras，缺失不拦截。
-    「待激活」行整行丢弃，与列表页同规则。无状态：同输入两次调用结果相同。
+    待激活行入模（pending=True）；带圈数字映射词条 roll_count，无标记即 0；
+    行首孤立短数字（标记误读形态）剥离后次数记 None（未知）+ 警告（D7）。
+    无状态：同输入两次调用结果相同。
     """
     failures: list[str] = []
     warnings: list[str] = []
@@ -348,10 +373,13 @@ def _read_main(recognition, textmap, failures, warnings, confidences) -> StatVal
 
 
 def _read_substats(recognition, profile, textmap, failures, warnings, confidences, enhance: bool):
-    """解析副词条各行；返回 (StatValue 列表, 待激活丢弃后的行数)。
+    """解析副词条各行；返回 (StatValue 列表, 已解锁行数)。
 
     enhance 表示强化页读取器：行清洗层追加「新」角标剥离与成长结算行合并
-    （列表页不存在这两种形态，异常双数值行走解析失败，见契约）。
+    （列表页不存在这两种形态，异常双数值行走解析失败，见契约）；带圈数字
+    ①~⑤ 映射词条强化次数、无标记即 0，行首孤立短数字（误读形态）记
+    None（未知）+ 警告；列表页 roll_count 恒 None。行数校验、代号查重与
+    一致性警告只计已解锁行（待激活行不计，M2.5 起）。
     """
     raw_boxes = [b for b in recognition.get("substats") or [] if strip_spaces(b.get("text", ""))]
     if not raw_boxes:
@@ -359,40 +387,79 @@ def _read_substats(recognition, profile, textmap, failures, warnings, confidence
     confidences["substats"] = min(box["score"] for box in raw_boxes)
 
     rows = _clean_substat_rows(_group_rows(raw_boxes), enhance)
-    if len(rows) > profile.substat_max:
+    unlocked_rows = [row for row in rows if not row.pending]
+    if len(unlocked_rows) > profile.substat_max:
         failures.append(
-            f"副词条行数超出档案上限：{len(rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
+            f"副词条行数超出档案上限：{len(unlocked_rows)}（档案 {profile.game} 上限 {profile.substat_max}）"
         )
 
     substats = []
     for row in rows:
-        stat = _parse_stat_row(row, textmap, failures, warnings, "副词条")
-        if stat is not None:
-            substats.append(stat)
+        stat = _parse_stat_row(row.text, textmap, failures, warnings, "副词条")
+        if stat is None:
+            continue
+        if row.pending:
+            # 待激活词条：预览值即解锁后初始值，次数恒未知（尚未强化过）
+            stat.pending = True
+            stat.roll_count = None
+        elif enhance:
+            if row.misread:
+                stat.roll_count = None
+                warnings.append(
+                    f"强化次数标记被误读为行首孤立数字，该词条次数记为未知：{row.text}"
+                )
+            else:
+                stat.roll_count = row.marker_count or 0
+        # 列表页不显示带圈数字：roll_count 保持 None（未知）
+        substats.append(stat)
 
-    codes = [stat.name for stat in substats]
+    codes = [stat.name for stat in substats if not stat.pending]
     for code in sorted({c for c in codes if codes.count(c) > 1}):
         failures.append(f"副词条代号重复：{code}")
 
-    return substats, len(rows)
+    return substats, len(unlocked_rows)
 
 
-def _clean_substat_rows(row_groups, enhance: bool) -> list[str]:
-    """行级清洗：行内框按横序拼接，去强化次数标记；「待激活」预览行与标记
-    独占行整行丢弃。强化页另剥离「新」角标（新解锁词条）并把成长结算行
+def _clean_substat_rows(row_groups, enhance: bool) -> list[_SubstatRow]:
+    """行级清洗：行内框按横序拼接，产出行文本与次数通道读数（M2.5）。
+
+    带圈数字 ①~⑤ 先提取为行内标记读数、再随全部标记字符剥离；「待激活」
+    标记替换为空格（保留名值切分位）、行记 pending；强化页另剥离「新」角标
+    （新解锁词条）与行首孤立短数字（标记误读形态，D7），并把成长结算行
     「名 旧值 新值」合并为「名 新值」——新值是当前值，判断依据是数值个数
-    （契约「强化页的读取时机与行形态」）。"""
-    rows = []
+    （契约「强化页的读取时机与行形态」）。清洗后无有效文字的行（标记独占行、
+    箭头杂字行）整行丢弃。
+    """
+    rows: list[_SubstatRow] = []
     for group in row_groups:
         text = " ".join(box.get("text", "") for box in sorted(group, key=lambda b: b["box"][0]))
+        center = sum(b["box"][1] + b["box"][3] / 2 for b in group) / len(group)
+        marker_count = next(
+            (count for ch, count in _ROLL_MARKER_COUNTS.items() if ch in text), None
+        )
         text = "".join(ch for ch in text if ch not in _ROLL_MARKERS)
+        pending = False
+        for mark in _PENDING_MARKS:
+            if mark in text:
+                text = text.replace(mark, " ")
+                pending = True
+                break
+        if pending:
+            # OCR 丢括号的残形（如「（待激活」）不再构成切分噪音
+            text = "".join(ch for ch in text if ch not in "（）()")
+        misread = False
         if enhance:
             text = _strip_new_marker(text)
-            text = _strip_roll_misread(text)
+            text, misread = _strip_roll_misread(text)
             text = _merge_settlement_row(text)
-        if not text.strip() or "待激活" in text:
+        if not text.strip():
             continue
-        rows.append(text.strip())
+        rows.append(
+            _SubstatRow(
+                text=text.strip(), center=center,
+                marker_count=marker_count, misread=misread, pending=pending,
+            )
+        )
     return rows
 
 
@@ -402,18 +469,19 @@ def _strip_new_marker(text: str) -> str:
     return stripped[1:].lstrip() if stripped.startswith("新") else stripped
 
 
-def _strip_roll_misread(text: str) -> str:
+def _strip_roll_misread(text: str) -> tuple[str, bool]:
     """剥离行首的一至两位孤立数字——强化次数标记的误读形态。
 
     带圈数字（①③）常被 OCR 误读为「0」「3」：或并入词条名框（行首数字），
     或独立成框与词条行聚组（行首数字 token）。词条名十族均不含数字，行首
     短数字不可能是词条内容；真值不受影响（数字开头的多字符片段如「3,967」
-    只出现在数值位置，且此处只剥行首 token）。
+    只出现在数值位置，且此处只剥行首 token）。返回 (剥离后文本, 是否误读)，
+    误读行由调用方把次数记 None（未知，design.md D7）。
     """
     tokens = text.split()
     if tokens and tokens[0].isdigit() and len(tokens[0]) <= 2:
-        return " ".join(tokens[1:])
-    return text
+        return " ".join(tokens[1:]), True
+    return text, False
 
 
 def _merge_settlement_row(text: str) -> str:

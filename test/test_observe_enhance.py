@@ -76,10 +76,10 @@ class TestReadEnhanceHappyPath:
         assert artifact.level == 19
         assert artifact.main == StatValue(name="atk_percent", value=31.5)
         assert artifact.substats == [
-            StatValue(name="crit_rate", value=5.8),
-            StatValue(name="atk", value=117.0),
-            StatValue(name="elemental_mastery", value=23.0),
-            StatValue(name="crit_dmg", value=12.4),
+            StatValue(name="crit_rate", value=5.8, roll_count=0),
+            StatValue(name="atk", value=117.0, roll_count=0),
+            StatValue(name="elemental_mastery", value=23.0, roll_count=0),
+            StatValue(name="crit_dmg", value=12.4, roll_count=0),
         ]
 
     def test_extras_hold_auxiliary_readings_and_fingerprint(self):
@@ -138,8 +138,8 @@ class TestReadEnhanceHappyPath:
 
 
 class TestReadEnhanceRowRules:
-    def test_pending_row_dropped_entirely(self):
-        """「待激活」预览行整行丢弃（与列表页同规则）。"""
+    def test_pending_row_enters_model(self):
+        """待激活预览行入模（M2.5）：pending=True、预览值入模、次数恒未知。"""
         recognition = make_enhance_recognition()
         recognition["level"] = [make_box("+0", 0.94)]
         recognition["substats"] = [
@@ -150,11 +150,36 @@ class TestReadEnhanceRowRules:
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert len(result.artifact.substats) == 3
+        assert result.failures == []
+        assert result.warnings == []
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=5.8, roll_count=0),
+            StatValue(name="atk", value=117.0, roll_count=0),
+            StatValue(name="elemental_mastery", value=23.0, roll_count=0),
+            StatValue(name="crit_dmg", value=15.5, roll_count=None, pending=True),
+        ]
+
+    def test_pending_row_before_value_enters_model(self):
+        """E1/E2 实测形态：待激活标记在词条名后、数值在另一框（名左值右聚行）。"""
+        recognition = make_enhance_recognition()
+        recognition["level"] = [make_box("+0", 0.94)]
+        recognition["substats"] = [
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+            make_box("元素精通 23", box=[800, 281, 200, 20]),
+            make_box("防御力（待激活）", box=[800, 316, 130, 22]),
+            make_box("6.6%", box=[1203, 314, 47, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats[-1] == StatValue(
+            name="def_percent", value=6.6, roll_count=None, pending=True
+        )
+        # 一致性行数只计已解锁行：5 星 +0 合法 3~4 条，3 条无警告
         assert result.warnings == []
 
-    def test_roll_marker_stripped_from_row_tail(self):
-        """强化次数标记不参与解析：行尾的 ① 去除后正常切分。"""
+    def test_roll_marker_sets_roll_count(self):
+        """行内带圈数字映射强化次数：①→1、②→2（标记可随名连写或行尾）。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("暴击率 5.8% ①", box=[800, 210, 200, 20]),
@@ -163,8 +188,21 @@ class TestReadEnhanceRowRules:
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.artifact.substats == [
-            StatValue(name="crit_rate", value=5.8),
-            StatValue(name="atk", value=117.0),
+            StatValue(name="crit_rate", value=5.8, roll_count=1),
+            StatValue(name="atk", value=117.0, roll_count=2),
+        ]
+
+    def test_no_marker_means_zero(self):
+        """强化页无带圈标记的词条 roll_count 为 0（与列表页的未知是两种状态）。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
+            make_box("攻击力 117", box=[800, 245, 200, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=5.8, roll_count=0),
+            StatValue(name="atk", value=117.0, roll_count=0),
         ]
 
     def test_row_reconstructed_from_split_boxes(self):
@@ -181,12 +219,12 @@ class TestReadEnhanceRowRules:
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.artifact.substats == [
-            StatValue(name="crit_rate", value=3.1),
-            StatValue(name="atk_percent", value=12.8),
+            StatValue(name="crit_rate", value=3.1, roll_count=1),
+            StatValue(name="atk_percent", value=12.8, roll_count=2),
         ]
 
-    def test_marker_only_box_dropped(self):
-        """标记独占文字框（OCR 把 ① 单成一行）整行忽略，不算行数也不算解析失败。"""
+    def test_marker_only_box_merges_into_row(self):
+        """标记独占文字框与词条行聚为一行时，为该行提供次数读数（E4 实测形态）。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("暴击率 5.8%", box=[800, 210, 200, 20]),
@@ -198,6 +236,8 @@ class TestReadEnhanceRowRules:
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert len(result.artifact.substats) == 4
+        assert result.artifact.substats[0].roll_count == 1
+        assert result.artifact.substats[1].roll_count == 0
         assert result.warnings == []
 
 
@@ -216,10 +256,10 @@ class TestReadEnhanceSettlementAndNewStat:
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.failures == []
-        assert result.artifact.substats == [StatValue(name="def_percent", value=11.1)]
+        assert result.artifact.substats == [StatValue(name="def_percent", value=11.1, roll_count=0)]
 
     def test_settlement_row_with_roll_marker_and_arrow_residue(self):
-        """带圈数字先剥离；箭头被 OCR 读出的杂字框丢弃，仍取最后一个数值。"""
+        """带圈数字先提取为次数读数再剥离；箭头被 OCR 读出的杂字框丢弃，仍取最后一个数值。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("①暴击率", box=[800, 210, 70, 20]),
@@ -229,7 +269,7 @@ class TestReadEnhanceSettlementAndNewStat:
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert result.artifact.substats == [StatValue(name="crit_rate", value=6.6)]
+        assert result.artifact.substats == [StatValue(name="crit_rate", value=6.6, roll_count=1)]
 
     def test_settlement_row_arrow_misread_as_junk(self):
         """箭头被误读为杂字（如「t」）同样丢弃——判断只看数值个数。"""
@@ -242,10 +282,10 @@ class TestReadEnhanceSettlementAndNewStat:
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert result.artifact.substats == [StatValue(name="hp_percent", value=18.1)]
+        assert result.artifact.substats == [StatValue(name="hp_percent", value=18.1, roll_count=0)]
 
     def test_new_stat_marker_stripped(self):
-        """「新」角标（新解锁词条）剥离后按普通单值解析。"""
+        """「新」角标（新解锁词条）剥离后按普通单值解析，次数为 0（E7 形态）。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("新", box=[778, 210, 24, 20]),
@@ -255,10 +295,22 @@ class TestReadEnhanceSettlementAndNewStat:
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.failures == []
-        assert result.artifact.substats == [StatValue(name="atk_percent", value=4.7)]
+        assert result.artifact.substats == [StatValue(name="atk_percent", value=4.7, roll_count=0)]
+
+    def test_new_marker_connected_to_name(self):
+        """E7 实测形态：「新」与词条名同框连写（「新攻击力」）。"""
+        recognition = make_enhance_recognition()
+        recognition["substats"] = [
+            make_box("新攻击力", box=[775, 210, 73, 23]),
+            make_box("4.7%", box=[1210, 210, 50, 20]),
+        ]
+        result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
+        assert result.ok is True
+        assert result.artifact.substats == [StatValue(name="atk_percent", value=4.7, roll_count=0)]
 
     def test_roll_marker_misread_as_leading_digit(self):
-        """带圈数字被误读为行首短数字（E6 实测形态：①→0、③→3）剥离后正常解析。"""
+        """带圈数字被误读为行首短数字（E6 实测形态：①→0、③→3）：剥离、
+        次数记 None（未知）+ 警告，绝不把误读数字当真值（design.md D7）。"""
         recognition = make_enhance_recognition()
         recognition["substats"] = [
             make_box("0", box=[780, 210, 16, 18]),
@@ -268,14 +320,20 @@ class TestReadEnhanceSettlementAndNewStat:
             make_box("3", box=[780, 245, 16, 18]),
             make_box("生命值", box=[800, 245, 60, 20]),
             make_box("18.1%", box=[1210, 245, 50, 20]),
+            make_box("攻击力 16", box=[800, 281, 200, 20]),
+            make_box("元素精通 23", box=[800, 316, 200, 20]),
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
         assert result.failures == []
         assert result.artifact.substats == [
-            StatValue(name="crit_rate", value=6.6),
-            StatValue(name="hp_percent", value=18.1),
+            StatValue(name="crit_rate", value=6.6, roll_count=None),
+            StatValue(name="hp_percent", value=18.1, roll_count=None),
+            StatValue(name="atk", value=16.0, roll_count=0),
+            StatValue(name="elemental_mastery", value=23.0, roll_count=0),
         ]
+        assert len(result.warnings) == 2
+        assert all("误读" in w for w in result.warnings)
 
     def test_single_value_row_unchanged(self):
         """静止单值行不受结算清洗影响（回归保护）。"""
@@ -286,7 +344,7 @@ class TestReadEnhanceSettlementAndNewStat:
         ]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert result.artifact.substats == [StatValue(name="crit_rate", value=3.1)]
+        assert result.artifact.substats == [StatValue(name="crit_rate", value=3.1, roll_count=0)]
 
 
 class TestReadEnhanceFailures:
@@ -367,5 +425,5 @@ class TestReadEnhanceFailures:
         recognition["substats"] = [make_box("歪词条 23")] + recognition["substats"][1:]
         result = read_enhance(recognition, CARRIED, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert result.artifact.substats[0] == StatValue(name="歪词条", value=23.0)
+        assert result.artifact.substats[0] == StatValue(name="歪词条", value=23.0, roll_count=0)
         assert any("歪词条" in w for w in result.warnings)

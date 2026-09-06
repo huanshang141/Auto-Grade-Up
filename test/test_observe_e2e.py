@@ -98,8 +98,9 @@ LIST_TRUTH = [
         0,
         False,
         ("def_percent", 8.7),
-        # 第 4 行「生命值+269（待激活）」整行丢弃
-        [("elemental_mastery", 23.0), ("atk_percent", 4.1), ("def", 16.0)],
+        # 第 4 行「生命值+269（待激活）」为待激活预览行（M2.5 起入模）
+        [("elemental_mastery", 23.0), ("atk_percent", 4.1), ("def", 16.0),
+         ("hp", 269.0, None, True)],
     ),
     (
         "L2_list_lv0_4sub",
@@ -224,8 +225,9 @@ LIST_TRUTH = [
         0,
         False,
         ("healing_bonus", 5.4),
-        # 生命值百分比与固定值并存；第 4 行「攻击力 4.7%（待激活）」整行丢弃
-        [("hp_percent", 4.7), ("atk", 18.0), ("hp", 209.0)],
+        # 生命值百分比与固定值并存；第 4 行「攻击力 4.7%（待激活）」为待激活预览行
+        [("hp_percent", 4.7), ("atk", 18.0), ("hp", 209.0),
+         ("atk_percent", 4.7, None, True)],
     ),
 ]
 
@@ -241,7 +243,9 @@ ENHANCE_TRUTH = [
         "黄金飞鸟的落羽",
         19,
         ("atk", 298.0),
-        [("crit_rate", 3.1), ("atk_percent", 12.8), ("hp_percent", 11.1), ("crit_dmg", 7.0)],
+        # ②攻击力（同框 Unicode 形态）→ 次数 2
+        [("crit_rate", 3.1, 0, False), ("atk_percent", 12.8, 2, False),
+         ("hp_percent", 11.1, 0, False), ("crit_dmg", 7.0, 0, False)],
         "2900/35575",
     ),
     (
@@ -251,7 +255,9 @@ ENHANCE_TRUTH = [
         "黄金飞鸟的落羽",
         19,
         ("atk", 298.0),
-        [("crit_rate", 3.1), ("atk_percent", 12.8), ("hp_percent", 11.1), ("crit_dmg", 7.0)],
+        # 同 fig2
+        [("crit_rate", 3.1, 0, False), ("atk_percent", 12.8, 2, False),
+         ("hp_percent", 11.1, 0, False), ("crit_dmg", 7.0, 0, False)],
         "2900/35575",
     ),
     (
@@ -261,8 +267,9 @@ ENHANCE_TRUTH = [
         "止于荣礼的缎彩",
         0,
         ("hp", 717.0),
-        # 第 4 行「防御力（待激活）6.6%」整行丢弃
-        [("hp_percent", 4.7), ("atk", 16.0), ("def", 19.0)],
+        # 第 4 行「防御力（待激活）6.6%」为待激活预览行（M2.5 起入模）
+        [("hp_percent", 4.7, 0, False), ("atk", 16.0, 0, False), ("def", 19.0, 0, False),
+         ("def_percent", 6.6, None, True)],
         "0/3000",
     ),
     (
@@ -272,8 +279,9 @@ ENHANCE_TRUTH = [
         "止于宏伟梦醒的时刻",
         0,
         ("def_percent", 8.7),
-        # 第 4 行「攻击力（待激活）18」整行丢弃
-        [("elemental_mastery", 23.0), ("energy_recharge", 5.8), ("hp_percent", 5.8)],
+        # 第 4 行「攻击力（待激活）18」为待激活预览行
+        [("elemental_mastery", 23.0, 0, False), ("energy_recharge", 5.8, 0, False),
+         ("hp_percent", 5.8, 0, False), ("atk", 18.0, None, True)],
         "0/3000",
     ),
     (
@@ -283,7 +291,8 @@ ENHANCE_TRUTH = [
         "止于荣礼的缎彩",
         0,
         ("hp", 717.0),
-        [("def", 21.0), ("elemental_mastery", 21.0), ("crit_rate", 3.9), ("energy_recharge", 4.5)],
+        [("def", 21.0, 0, False), ("elemental_mastery", 21.0, 0, False),
+         ("crit_rate", 3.9, 0, False), ("energy_recharge", 4.5, 0, False)],
         "0/3000",
     ),
     # —— 2026-08-29 第二、三批补拍（真值来源：README 验收记录）——
@@ -295,8 +304,11 @@ ENHANCE_TRUTH = [
         "魔战士的羽面",
         16,
         ("crit_dmg", 51.6),
-        # 四条副词条均带强化次数标记 ①（5 星 +16 四次成长各一次），剥离后解析
-        [("hp", 508.0), ("crit_rate", 5.8), ("atk_percent", 9.9), ("def_percent", 13.9)],
+        # 四条副词条均带强化次数标记 ①：生命值行 Unicode 同框（1）；暴击率行
+        # 标记被误读为「0」（次数记未知 + 警告，M2.5 双通道到位后由交叉修复）；
+        # 攻击力、防御力行标记整体丢失（1 倍整图，暂记 0）
+        [("hp", 508.0, 1, False), ("crit_rate", 5.8, None, False),
+         ("atk_percent", 9.9, 0, False), ("def_percent", 13.9, 0, False)],
         "280/23500",
     ),
     (
@@ -308,7 +320,8 @@ ENHANCE_TRUTH = [
         ("hp", 2108.0),  # 主词条千位逗号
         # 第 4 行「防御力 5.8% → 11.1% ↑」为成长结算形态，取新值；面包屑分隔符
         # 被 OCR 读丢，按部位名前缀匹配切分（契约修订）
-        [("crit_dmg", 4.4), ("elemental_mastery", 15.0), ("hp_percent", 3.7), ("def_percent", 11.1)],
+        [("crit_dmg", 4.4, 0, False), ("elemental_mastery", 15.0, 0, False),
+         ("hp_percent", 3.7, 0, False), ("def_percent", 11.1, 0, False)],
         "1700/7375",
     ),
     (
@@ -318,10 +331,11 @@ ENHANCE_TRUTH = [
         "止于宏伟梦醒的时刻",
         20,
         ("energy_recharge", 51.8),
-        # ①暴击率「3.5% → 6.6% ↑」结算行取新值；③生命值 18.1%；标记被误读为
-        # 「0」「3」由解析层剥离；满级形态 exp 传 None——经验条无数字、素材区
-        # 整体消失（契约），extras 仅剩指纹
-        [("crit_dmg", 6.2), ("hp", 269.0), ("crit_rate", 6.6), ("hp_percent", 18.1)],
+        # ①暴击率「3.5% → 6.6% ↑」结算行取新值、③生命值 18.1%——标记均被
+        # 误读为「0」「3」（次数记未知 + 警告，M2.5 双通道到位后由交叉修复）；
+        # 满级形态 exp 传 None——经验条无数字、素材区整体消失（契约）
+        [("crit_dmg", 6.2, 0, False), ("hp", 269.0, 0, False),
+         ("crit_rate", 6.6, None, False), ("hp_percent", 18.1, None, False)],
         None,
     ),
     (
@@ -331,12 +345,16 @@ ENHANCE_TRUTH = [
         "绯花之壶",
         4,
         ("geo_dmg_bonus", 14.9),
-        # 第 4 行「新 攻击力 4.7%」为新解锁词条（「新」角标剥离）；星级 5 由
+        # 第 4 行「新攻击力 4.7%」为新解锁词条（「新」角标剥离、次数 0）；星级 5 由
         # 三初始词条 + +4 解锁第 4 条的节奏实证
-        [("crit_rate", 2.7), ("crit_dmg", 6.2), ("def", 21.0), ("atk_percent", 4.7)],
+        [("crit_rate", 2.7, 0, False), ("crit_dmg", 6.2, 0, False),
+         ("def", 21.0, 0, False), ("atk_percent", 4.7, 0, False)],
         "1200/5900",
     ),
 ]
+
+# 次数标记被误读为行首数字的夹具 → 该页警告条数（M2.5 D7 防御层；均为「误读」警告）
+ENHANCE_MISREAD_WARNINGS = {"E4_enhance_lv16_marks": 1, "E6_enhance_lv20_max": 2}
 
 
 @pytest.fixture(scope="module")
@@ -372,7 +390,18 @@ def recognize():
 
 
 def assert_stat_rows(actual, expected) -> None:
-    assert actual == [StatValue(name=name, value=value) for name, value in expected]
+    """真值行：(名, 值) 为列表页默认形状（roll_count=None、未待激活）；
+    (名, 值, roll_count, pending) 显式给出扩展形状。"""
+    wanted = []
+    for row in expected:
+        if len(row) == 2:
+            wanted.append(StatValue(name=row[0], value=row[1]))
+        else:
+            name, value, roll_count, pending = row
+            wanted.append(
+                StatValue(name=name, value=value, roll_count=roll_count, pending=pending)
+            )
+    assert actual == wanted
 
 
 class TestListEndToEnd:
@@ -416,7 +445,6 @@ class TestEnhanceEndToEnd:
         result = read_enhance(dump, carried, PROFILE, TEXTMAP)
         assert result.failures == []
         assert result.ok is True
-        assert result.warnings == []
         artifact = result.artifact
         assert artifact.slot == slot
         assert artifact.rarity == carried.rarity
@@ -434,6 +462,12 @@ class TestEnhanceEndToEnd:
             assert result.extras["fodder_tier"] == FODDER_TIER_TEXT
             assert re.fullmatch(MORA_PATTERN, result.extras["mora"])
             assert result.extras["fingerprint"] == {"slot": slot, "name": name}
+        misread = ENHANCE_MISREAD_WARNINGS.get(stem, 0)
+        if misread:
+            assert len(result.warnings) == misread
+            assert all("误读" in w for w in result.warnings)
+        else:
+            assert result.warnings == []
         assert min(result.confidences.values()) >= 0.6
 
 

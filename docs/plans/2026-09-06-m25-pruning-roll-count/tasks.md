@@ -85,7 +85,7 @@
 
 ## 3. 观测侧
 
-- [ ] 3.1 解析核心：待激活入模与强化次数解析
+- [x] 3.1 解析核心：待激活入模与强化次数解析
   Goal:     待激活行产出 pending 词条；带圈数字映射为强化次数；误读形态走防御层。
   Read:     agent/observe.py:117-176 （read_list）
             agent/observe.py:178-253 （read_enhance）

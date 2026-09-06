@@ -121,8 +121,9 @@ class TestReadListHappyPath:
 
 
 class TestReadListPendingActivationRow:
-    def test_pending_row_dropped_entirely(self):
-        """「待激活」预览行整行丢弃：不计入行数、代号与数值（5 星 +0 为 3 条合法）。"""
+    def test_pending_row_enters_model(self):
+        """待激活预览行入模（M2.5）：pending=True、预览值入模、次数恒未知；
+        不计入已解锁条数（5 星 +0 解锁 3 条，合法 3~4 条无警告）。"""
         recognition = make_list_recognition()
         recognition["level"] = [make_box("+0", 0.94)]
         recognition["substats"] = [
@@ -133,9 +134,20 @@ class TestReadListPendingActivationRow:
         ]
         result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
         assert result.ok is True
-        assert len(result.artifact.substats) == 3
-        assert all("crit_dmg" != s.name for s in result.artifact.substats)
+        assert result.failures == []
         assert result.warnings == []
+        assert result.artifact.substats == [
+            StatValue(name="crit_rate", value=5.8),
+            StatValue(name="atk", value=117.0),
+            StatValue(name="elemental_mastery", value=23.0),
+            StatValue(name="crit_dmg", value=15.5, roll_count=None, pending=True),
+        ]
+
+    def test_list_roll_count_always_none(self):
+        """列表页不显示带圈数字：roll_count 恒 None（未知，与 0 是两种状态）。"""
+        recognition = make_list_recognition()
+        result = read_list(recognition, GENSHIN_PROFILE, TEXTMAP)
+        assert all(s.roll_count is None and s.pending is False for s in result.artifact.substats)
 
 
 class TestReadListWarnings:
