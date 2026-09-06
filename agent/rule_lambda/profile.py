@@ -1,9 +1,9 @@
 """游戏档案（game profile）的加载与校验，以及圣遗物值域校验。
 
 游戏档案声明一个游戏的领域参数——属性代号清单、部位代号清单、等级上限、
-词条变动间隔、星级范围、副词条上限、回合机制；是字段、值域与剩余强化次数
-公式的唯一来源，代码不硬编码任何游戏数值（ADR-0004）。每个游戏随其资源包
-维护一份：assets/resource/<游戏>/profile.json。
+词条变动间隔、星级范围、副词条上限、回合机制、单次强化成长上限表；是字段、
+值域与剩余强化次数公式的唯一来源，代码不硬编码任何游戏数值（ADR-0004）。
+每个游戏随其资源包维护一份：assets/resource/<游戏>/profile.json。
 
 档案缺失、结构不符或声明了代码不认识的回合机制 → 抛 ProfileError，
 调用方立即停止（与规则文件同一纪律，见设计文档 §4「游戏档案」）。
@@ -35,7 +35,12 @@ KNOWN_ROUND_MECHANISMS: frozenset[str] = frozenset({"staged_fill"})
 
 @dataclass
 class GameProfile:
-    """一份已加载的游戏档案。stats/slots 用集合语义参与校验。"""
+    """一份已加载的游戏档案。stats/slots 用集合语义参与校验。
+
+    roll_growth_max：单次强化成长上限表（星级 → 属性代号 → 单次强化最大成长值），
+    强化剪枝推导的唯一数值输入（ADR-0006）；只录实际可作副词条的属性代号。
+    source_path：档案来源路径，支撑查表缺数据时的报错定位。
+    """
 
     version: int
     game: str
@@ -48,6 +53,22 @@ class GameProfile:
     rarity_max: int
     substat_max: int
     round_mechanism: str
+    roll_growth_max: dict[int, dict[str, float]]
+    source_path: str
+
+    def growth_max(self, rarity: int, code: str) -> float:
+        """查某星级某属性代号的单次强化成长上限；缺表抛 ProfileError。
+
+        缺数据不做消耗性决策（与档案缺键同一纪律）：错误配置应在校验期拦截，
+        运行期查不到表即带着档案路径立即停止（design.md D1）。
+        """
+        row = self.roll_growth_max.get(rarity)
+        if row is None or code not in row:
+            raise ProfileError(
+                f"档案无 {rarity} 星 {code} 的单次强化成长上限数据（强化剪枝推导需要）",
+                self.source_path,
+            )
+        return row[code]
 
 
 _PROFILE_KEYS = {
@@ -61,6 +82,7 @@ _PROFILE_KEYS = {
     "rarity_range",
     "substat_max",
     "round_mechanism",
+    "roll_growth_max",
 }
 
 
@@ -121,6 +143,8 @@ def load_profile(path: str | Path) -> GameProfile:
             path,
         )
 
+    roll_growth_max = _check_growth_table(data, frozenset(data["stats"]), rarity_range[0], rarity_range[1], path)
+
     return GameProfile(
         version=version,
         game=data["game"],
@@ -133,6 +157,8 @@ def load_profile(path: str | Path) -> GameProfile:
         rarity_max=rarity_range[1],
         substat_max=substat_max,
         round_mechanism=mechanism,
+        roll_growth_max=roll_growth_max,
+        source_path=str(path),
     )
 
 
@@ -162,6 +188,55 @@ def _check_non_negative_int(data: dict, key: str, path) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ProfileError(f"{key} 必须是非负整数，实际为 {value!r}", path)
     return value
+
+
+def _check_growth_table(
+    data: dict, stats: frozenset[str], rarity_min: int, rarity_max: int, path
+) -> dict[int, dict[str, float]]:
+    """校验单次强化成长上限表：星级键可解析为整数且落在档案星级范围内、
+    属性代号在档案清单内、值全为正数。允许不覆盖全部星级（缺表在查表时抛错）。
+    """
+    table = data["roll_growth_max"]
+    if not isinstance(table, dict):
+        raise ProfileError(
+            f"roll_growth_max 必须是对象，实际为 {type(table).__name__}", path
+        )
+    checked: dict[int, dict[str, float]] = {}
+    for star_key, row in table.items():
+        star = _parse_star_key(star_key, rarity_min, rarity_max, path)
+        if not isinstance(row, dict):
+            raise ProfileError(
+                f"roll_growth_max 的 {star} 星行必须是对象，实际为 {type(row).__name__}", path
+            )
+        codes: dict[str, float] = {}
+        for code, value in row.items():
+            if code not in stats:
+                raise ProfileError(
+                    f"roll_growth_max 的 {star} 星行含档案清单外的属性代号：{code!r}", path
+                )
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+                raise ProfileError(
+                    f"roll_growth_max 的 {star} 星 {code} 必须是正数，实际为 {value!r}", path
+                )
+            codes[code] = float(value)
+        checked[star] = codes
+    return checked
+
+
+def _parse_star_key(star_key, rarity_min: int, rarity_max: int, path) -> int:
+    """星级键是「十进制数字串的整数」：不可解析或越出档案星级范围即拒绝。"""
+    if not isinstance(star_key, str) or not star_key.isdecimal():
+        raise ProfileError(
+            f"roll_growth_max 的星级键必须是数字字符串，实际为 {star_key!r}", path
+        )
+    star = int(star_key)
+    if not rarity_min <= star <= rarity_max:
+        raise ProfileError(
+            f"roll_growth_max 的星级键超出档案星级范围：{star_key!r}"
+            f"（档案范围 [{rarity_min}, {rarity_max}]）",
+            path,
+        )
+    return star
 
 
 def validate_artifact(artifact, profile: GameProfile) -> None:

@@ -25,7 +25,7 @@
   "round_mechanism": "staged_fill",// 回合机制声明；代码只接受已实现的机制
   "roll_growth_max": {             // 单次强化成长上限表（M2.5 新增）
     "5": {"crit_rate": 3.9},       // 星级（字符串数字）→ 属性代号 → 单次强化最大成长值
-    "4": {"crit_rate": 2.7}
+    "4": {"crit_rate": 3.1}
   }
 }
 ```

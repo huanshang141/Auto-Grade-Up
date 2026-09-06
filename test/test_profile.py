@@ -46,7 +46,25 @@ def make_profile_dict() -> dict:
         "rarity_range": [1, 5],
         "substat_max": 4,
         "round_mechanism": "staged_fill",
+        "roll_growth_max": make_growth_table(),
     }
+
+
+def make_growth_table() -> dict:
+    """合法的成长上限表（与原神档案同构的 4/5 星全 10 个副词条代号）。"""
+    values = {
+        "hp": 299, "atk": 19, "def": 23,
+        "hp_percent": 5.8, "atk_percent": 5.8, "def_percent": 7.3,
+        "elemental_mastery": 23, "energy_recharge": 6.5,
+        "crit_rate": 3.9, "crit_dmg": 7.8,
+    }
+    four_star = {
+        "hp": 239, "atk": 16, "def": 19,
+        "hp_percent": 4.7, "atk_percent": 4.7, "def_percent": 5.8,
+        "elemental_mastery": 19, "energy_recharge": 5.2,
+        "crit_rate": 3.1, "crit_dmg": 6.2,
+    }
+    return {"5": values, "4": four_star}
 
 
 def write_and_load(tmp_path: Path, data, name="profile.json") -> GameProfile:
@@ -93,6 +111,42 @@ class TestLoadRealGenshinProfile:
         assert profile.rarity_max == 5
         assert profile.substat_max == 4
         assert profile.round_mechanism == "staged_fill"
+
+    def test_real_profile_source_path_recorded(self):
+        profile = load_profile(GENSHIN_PROFILE)
+        assert profile.source_path.endswith("profile.json")
+
+    def test_real_growth_table_covers_both_rarities(self):
+        """4/5 星全 10 个副词条代号有表；治疗加成与七种伤害加成只作主词条、不进副词条池，无表数据。"""
+        profile = load_profile(GENSHIN_PROFILE)
+        assert set(profile.roll_growth_max) == {4, 5}
+        substat_pool = {
+            "hp", "atk", "def", "hp_percent", "atk_percent", "def_percent",
+            "elemental_mastery", "energy_recharge", "crit_rate", "crit_dmg",
+        }
+        assert set(profile.roll_growth_max[5]) == substat_pool
+        assert set(profile.roll_growth_max[4]) == substat_pool
+
+    def test_real_growth_max_queries(self):
+        profile = load_profile(GENSHIN_PROFILE)
+        assert profile.growth_max(5, "crit_rate") == 3.9
+        assert profile.growth_max(5, "crit_dmg") == 7.8
+        assert profile.growth_max(4, "crit_dmg") == 6.2
+        assert profile.growth_max(4, "hp") == 239.0
+
+    def test_growth_max_missing_rarity_raises_with_star_and_code(self):
+        profile = load_profile(GENSHIN_PROFILE)
+        with pytest.raises(ProfileError) as exc_info:
+            profile.growth_max(3, "crit_rate")
+        assert "3" in exc_info.value.message and "crit_rate" in exc_info.value.message
+        assert exc_info.value.path.endswith("profile.json")
+
+    def test_growth_max_missing_code_raises(self):
+        """主词条专属代号（如治疗加成）在档案 stats 内但无副词条成长数据，查表抛错。"""
+        profile = load_profile(GENSHIN_PROFILE)
+        with pytest.raises(ProfileError) as exc_info:
+            profile.growth_max(5, "healing_bonus")
+        assert "healing_bonus" in exc_info.value.message
 
     def test_real_profile_accepts_legal_artifact(self):
         profile = load_profile(GENSHIN_PROFILE)
@@ -212,6 +266,62 @@ class TestLoadProfileRejections:
         data["round_mechanism"] = "per_roll"
         with pytest.raises(ProfileError):
             write_and_load(tmp_path, data)
+
+
+class TestGrowthTableRejections:
+    """成长上限表逐类非法样例被拒：星级键、属性代号、数值三道关。"""
+
+    @pytest.mark.parametrize("star_key", ["6", "0", "five", "5.0", "", " "])
+    def test_illegal_star_key(self, tmp_path, star_key):
+        data = make_profile_dict()
+        table = make_growth_table()
+        table[star_key] = table.pop("5")
+        data["roll_growth_max"] = table
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    def test_star_key_out_of_range_message(self, tmp_path):
+        data = make_profile_dict()
+        data["roll_growth_max"] = {"6": {"crit_rate": 3.9}}
+        path = tmp_path / "profile.json"
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        with pytest.raises(ProfileError) as exc_info:
+            load_profile(path)
+        assert "星级范围" in exc_info.value.message
+
+    def test_table_not_a_dict(self, tmp_path):
+        data = make_profile_dict()
+        data["roll_growth_max"] = [["5", "crit_rate"]]
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    def test_row_not_a_dict(self, tmp_path):
+        data = make_profile_dict()
+        data["roll_growth_max"] = {"5": 3.9}
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    def test_code_not_in_stats(self, tmp_path):
+        data = make_profile_dict()
+        data["roll_growth_max"] = {"5": {"mana": 10}}
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    @pytest.mark.parametrize("value", [0, -3.9, "3.9", True, None])
+    def test_non_positive_or_non_numeric_value(self, tmp_path, value):
+        data = make_profile_dict()
+        data["roll_growth_max"] = {"5": {"crit_rate": value}}
+        with pytest.raises(ProfileError):
+            write_and_load(tmp_path, data)
+
+    def test_partial_star_coverage_legal(self, tmp_path):
+        """允许不覆盖全部星级（缺表在查表时抛错，档案加载不拦）。"""
+        data = make_profile_dict()
+        data["roll_growth_max"] = {"5": {"crit_rate": 3.9}}
+        profile = write_and_load(tmp_path, data)
+        assert profile.growth_max(5, "crit_rate") == 3.9
+        with pytest.raises(ProfileError):
+            profile.growth_max(4, "crit_rate")
 
 
 class TestValidateArtifact:

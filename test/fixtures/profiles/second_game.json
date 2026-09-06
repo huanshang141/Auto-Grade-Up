@@ -19,5 +19,19 @@
   "roll_interval": 5,
   "rarity_range": [1, 5],
   "substat_max": 4,
-  "round_mechanism": "staged_fill"
+  "round_mechanism": "staged_fill",
+  "roll_growth_max": {
+    "5": {
+      "crit_rate": 3.9,
+      "crit_dmg": 7.8,
+      "hp": 299,
+      "second_stat": 10
+    },
+    "4": {
+      "crit_rate": 3.1,
+      "crit_dmg": 6.2,
+      "hp": 239,
+      "second_stat": 8
+    }
+  }
 }

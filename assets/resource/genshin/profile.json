@@ -34,5 +34,31 @@
   "roll_interval": 4,
   "rarity_range": [1, 5],
   "substat_max": 4,
-  "round_mechanism": "staged_fill"
+  "round_mechanism": "staged_fill",
+  "roll_growth_max": {
+    "5": {
+      "hp": 299,
+      "atk": 19,
+      "def": 23,
+      "hp_percent": 5.8,
+      "atk_percent": 5.8,
+      "def_percent": 7.3,
+      "elemental_mastery": 23,
+      "energy_recharge": 6.5,
+      "crit_rate": 3.9,
+      "crit_dmg": 7.8
+    },
+    "4": {
+      "hp": 239,
+      "atk": 16,
+      "def": 19,
+      "hp_percent": 4.7,
+      "atk_percent": 4.7,
+      "def_percent": 5.8,
+      "elemental_mastery": 19,
+      "energy_recharge": 5.2,
+      "crit_rate": 3.1,
+      "crit_dmg": 6.2
+    }
+  }
 }
