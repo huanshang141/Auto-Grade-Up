@@ -24,3 +24,12 @@
   录入未查证的数字反而制造假数据。缺表查表抛错（growth_max → ProfileError）
   保证万一机制变动时响亮失败。规格工作副本示例值 2.7（5 星最低档）同步勘正为 3.1
 - Now:    需求方指令连跑到 4.1，不再逐任务停等（2026-09-06）
+
+## 2026-09-06 · 任务 1.2 词条值对象扩展（roll_count / pending）
+- Tried:  StatValue 增 roll_count（可空键、序列化始终写出）与 pending（True 才写出）；
+  from_dict 接受新旧两种形状；validate_artifact 增次数值域与待激活互斥校验
+- Result: test_model.py 新增 12 项、test_profile.py 新增 7 项全绿；旧形状 JSON
+  加载与新形状 JSON 往返均有断言；全量 379 项通过
+- 备注:   主词条序列化保持 {name, value}（契约：主词条不带次数字段）；
+  spec 示例形状测试随新契约同步更新
+- Now:    进入任务 2.1（规则文件格式修订）

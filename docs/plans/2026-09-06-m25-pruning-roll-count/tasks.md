@@ -4,7 +4,7 @@
 
 ## 1. 档案与数据模型
 
-- [ ] 1.1 档案单次强化成长上限表
+- [x] 1.1 档案单次强化成长上限表
   Goal:     决策机构可按「星级 × 属性代号」查单次强化成长最大值；缺表在规则校验层与求值层报错。
   Read:     assets/resource/genshin/profile.json（现行键集）
             agent/rule_lambda/profile.py:36-64   （GameProfile 字段）
@@ -22,7 +22,7 @@
   Verify:   python -m pytest test/test_profile.py -q  →  新增断言全绿（表结构、非法键拒绝、growth_max 查询与缺表抛错）
   Done:     原神档案带 4/5 星全 19 代号的上限表；非法档案样例被拒并带路径报错。
 
-- [ ] 1.2 词条值对象扩展（roll_count / pending）
+- [x] 1.2 词条值对象扩展（roll_count / pending）
   Goal:     词条可携带强化次数（可空）与待激活标记，序列化形状可区分「未知」与「0」。
   Read:     agent/rule_lambda/model.py:16-47  （StatValue / Artifact 定义）
             agent/rule_lambda/model.py:50-117  （from_dict / to_dict / _check_stat）

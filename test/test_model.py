@@ -39,8 +39,8 @@ class TestRoundtrip:
             "locked": False,
             "main": {"name": "atk_percent", "value": 31.5},
             "substats": [
-                {"name": "crit_rate", "value": 5.8},
-                {"name": "atk", "value": 117.0},
+                {"name": "crit_rate", "value": 5.8, "roll_count": None},
+                {"name": "atk", "value": 117.0, "roll_count": None},
             ],
         }
         assert make_artifact().to_dict() == expected
@@ -121,6 +121,81 @@ class TestStripSpaces:
 
     def test_full_width_space(self):
         assert strip_spaces("\u3000atk\u3000") == "atk"
+
+
+class TestRollCountAndPending:
+    """M2.5 词条值对象扩展（design.md D2）：roll_count 键始终写出、pending 键可省略。"""
+
+    def test_default_shape_unchanged(self):
+        """不带扩展信息的词条：roll_count 写出为 null、pending 键省略。"""
+        artifact = make_artifact()
+        assert artifact.to_dict()["substats"][0] == {
+            "name": "crit_rate", "value": 5.8, "roll_count": None,
+        }
+        assert artifact.to_dict()["main"] == {"name": "atk_percent", "value": 31.5}
+
+    def test_full_shape_roundtrip_lossless(self):
+        artifact = Artifact(
+            slot="sands", rarity=5, set="辰砂往生录", level=4, locked=False,
+            main=StatValue(name="atk_percent", value=31.5),
+            substats=[
+                StatValue(name="crit_rate", value=5.8, roll_count=2),
+                StatValue(name="atk", value=117.0, roll_count=0),
+                StatValue(name="hp", value=269.0, pending=True),
+            ],
+        )
+        loaded = Artifact.from_dict(json.loads(json.dumps(artifact.to_dict())))
+        assert loaded == artifact
+        assert loaded.substats[0].roll_count == 2
+        assert loaded.substats[1].roll_count == 0
+        assert loaded.substats[2].roll_count is None
+        assert loaded.substats[2].pending is True
+
+    def test_old_shape_json_still_loads(self):
+        """旧形状 JSON（无扩展键）仍可加载：roll_count=None、pending=False。"""
+        data = make_artifact().to_dict()
+        loaded = Artifact.from_dict(data)
+        assert all(s.roll_count is None and s.pending is False for s in loaded.substats)
+
+    def test_null_roll_count_accepted(self):
+        data = make_artifact().to_dict()
+        data["substats"][0]["roll_count"] = None
+        assert Artifact.from_dict(data).substats[0].roll_count is None
+
+    def test_main_rejects_roll_count_key(self):
+        """主词条不带次数字段（界面无此显示），序列化也不写出——形状上直接拒绝。"""
+        data = make_artifact().to_dict()
+        data["main"]["roll_count"] = 1
+        with pytest.raises(ValueError):
+            Artifact.from_dict(data)
+
+    @pytest.mark.parametrize("roll_count", [-1, 2.5, "2", True])
+    def test_illegal_roll_count_rejected(self, roll_count):
+        data = make_artifact().to_dict()
+        data["substats"][0]["roll_count"] = roll_count
+        with pytest.raises(ValueError):
+            Artifact.from_dict(data)
+
+    def test_zero_roll_count_is_number_not_null(self):
+        """0（界面无带圈标记）与 null（界面不显示该信息）是两种事实。"""
+        data = make_artifact().to_dict()
+        data["substats"][0]["roll_count"] = 0
+        stat = Artifact.from_dict(data).substats[0]
+        assert stat.roll_count == 0
+        assert Artifact.from_dict(data).to_dict()["substats"][0]["roll_count"] == 0
+
+    @pytest.mark.parametrize("pending", ["yes", 1, 0, None])
+    def test_illegal_pending_rejected(self, pending):
+        data = make_artifact().to_dict()
+        data["substats"][0]["pending"] = pending
+        with pytest.raises(ValueError):
+            Artifact.from_dict(data)
+
+    def test_unknown_substat_key_rejected(self):
+        data = make_artifact().to_dict()
+        data["substats"][0]["rolls"] = 2
+        with pytest.raises(ValueError):
+            Artifact.from_dict(data)
 
 
 class TestFromDictShapeValidation:

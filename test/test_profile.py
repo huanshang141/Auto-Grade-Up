@@ -364,3 +364,34 @@ class TestValidateArtifact:
         substats = [StatValue(name="crit_rate", value=5.8) for _ in range(5)]
         with pytest.raises(ArtifactValidationError):
             validate_artifact(make_artifact(substats=substats), profile)
+
+
+class TestRollCountValueDomain:
+    """词条强化次数值域（M2.5）：[0, ⌈max_level ÷ roll_interval⌉]（原神 5），
+    待激活词条不得携带正次数；null 与边界值放行。"""
+
+    @pytest.fixture()
+    def profile(self) -> GameProfile:
+        return load_profile(GENSHIN_PROFILE)
+
+    @pytest.mark.parametrize("roll_count", [None, 0, 5])
+    def test_roll_count_boundary_pass(self, profile, roll_count):
+        substats = [StatValue(name="crit_rate", value=5.8, roll_count=roll_count)]
+        assert validate_artifact(make_artifact(substats=substats), profile) is None
+
+    @pytest.mark.parametrize("roll_count", [-1, 6])
+    def test_roll_count_out_of_range(self, profile, roll_count):
+        substats = [StatValue(name="crit_rate", value=5.8, roll_count=roll_count)]
+        with pytest.raises(ArtifactValidationError):
+            validate_artifact(make_artifact(substats=substats), profile)
+
+    @pytest.mark.parametrize("roll_count", [None, 0])
+    def test_pending_with_zero_or_null_passes(self, profile, roll_count):
+        substats = [StatValue(name="hp", value=269.0, roll_count=roll_count, pending=True)]
+        assert validate_artifact(make_artifact(substats=substats), profile) is None
+
+    def test_pending_with_positive_count_rejected(self, profile):
+        substats = [StatValue(name="hp", value=269.0, roll_count=2, pending=True)]
+        with pytest.raises(ArtifactValidationError) as exc_info:
+            validate_artifact(make_artifact(substats=substats), profile)
+        assert "待激活" in exc_info.value.args[0]

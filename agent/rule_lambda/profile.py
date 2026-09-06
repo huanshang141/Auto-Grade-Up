@@ -243,8 +243,10 @@ def validate_artifact(artifact, profile: GameProfile) -> None:
     """校验圣遗物当前属性的值域；违规抛 ArtifactValidationError。
 
     值域由档案声明：等级 ∈ [0, max_level]、星级 ∈ [rarity_min, rarity_max]、
-    部位 ∈ slots、副词条条数 ≤ substat_max。字段类型与结构的形状校验由
-    model.from_dict 负责，本函数只查值域。
+    部位 ∈ slots、副词条条数 ≤ substat_max、词条强化次数
+    ∈ [0, ⌈max_level ÷ roll_interval⌉]（宽松上界，取全部变动点投入同一词条的
+    极端形态）且待激活词条不得带正次数（design.md D2）。字段类型与结构的形状
+    校验由 model.from_dict 负责，本函数只查值域。
     """
     if not 0 <= artifact.level <= profile.max_level:
         raise ArtifactValidationError(
@@ -266,3 +268,14 @@ def validate_artifact(artifact, profile: GameProfile) -> None:
             f"substats 条数超出档案上限：{len(artifact.substats)}"
             f"（档案 {profile.game} 上限 {profile.substat_max}）"
         )
+    max_rolls = -(-profile.max_level // profile.roll_interval)
+    for index, substat in enumerate(artifact.substats):
+        if substat.roll_count is not None and not 0 <= substat.roll_count <= max_rolls:
+            raise ArtifactValidationError(
+                f"substats[{index}] 的强化次数超出档案值域：{substat.roll_count!r}"
+                f"（档案 {profile.game} 范围 [0, {max_rolls}]）"
+            )
+        if substat.pending and substat.roll_count:
+            raise ArtifactValidationError(
+                f"substats[{index}] 为待激活词条，不得携带正强化次数：{substat.roll_count!r}"
+            )
