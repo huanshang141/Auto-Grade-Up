@@ -111,7 +111,7 @@
 
 ## 5. 收尾
 
-- [ ] 5.1 文档口径收口与归档
+- [x] 5.1 文档口径收口与归档
   Goal:     README 现行口径与实际一致；变更文件夹归档
   Read:     test/fixtures/incoming/README.md  (缺口清单状态、待补拍节)
             docs/plans/2026-08-29-observe-robustness/tasks.md
